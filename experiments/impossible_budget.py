@@ -57,6 +57,7 @@ class BudgetGateway:
         agent_limits: dict[str, float] | None = None,
         max_tokens: int | None = None,
         deadline_monotonic: float | None = None,
+        max_in_flight: int = 1,
     ) -> None:
         if not isinstance(key, str) or not key:
             raise ValueError("An OpenRouter key must be supplied in memory")
@@ -69,6 +70,8 @@ class BudgetGateway:
                 raise ValueError("agent_limits must map agent IDs to positive dollar limits")
         if deadline_monotonic is not None and not math.isfinite(deadline_monotonic):
             raise ValueError("deadline must be finite")
+        if isinstance(max_in_flight, bool) or not isinstance(max_in_flight, int) or max_in_flight < 1:
+            raise ValueError("max_in_flight must be a positive integer")
         self._agent_limits = dict(agent_limits or {})
         self._max_tokens = max_tokens
         self._deadline = deadline_monotonic
@@ -84,6 +87,9 @@ class BudgetGateway:
         self._ledger_path = self._outdir / "usage.jsonl"
         self._state_path = self._outdir / "accounting.json"
         self._lock = threading.RLock()
+        # Caps concurrent upstream calls. Budget safety does not depend on it:
+        # every in-flight request already holds a conservative reservation.
+        self._in_flight = threading.BoundedSemaphore(max_in_flight)
         self._spent = 0.0
         self._reserved: dict[str, float] = {}
         self._accounting_uncertain = False
@@ -413,52 +419,55 @@ class BudgetGateway:
         token_reservation = len(raw) + 10_000 + output_tokens
         request_id = f"request-{threading.get_ident()}-{datetime.now(timezone.utc).timestamp()}"
 
-        # Serialize the reservation and the complete upstream exchange. This
-        # avoids concurrent requests oversubscribing the shared budget.
-        with self._lock:
-            if self._deadline is not None and time.monotonic() >= self._deadline:
-                self._stop_reason = "deadline"
-                self._persist_locked()
-                self._error(handler, 402, "episode deadline reached")
-                return
-            if self._stop_reason:
-                self._error(handler, 402, "remaining budget exhausted: " + self._stop_reason)
-                return
-            if agent_id in self._agent_stops:
-                self._error(handler, 402, "agent budget exhausted")
-                return
-            if self._accounting_uncertain:
-                self._error(handler, 503, "accounting is uncertain; dispatch disabled")
-                return
-            if self._agent_limits:
-                agent_committed = sum(e["cost"] for e in self._entries if e.get("agent") == agent_id) + sum(v for k, v in self._reserved.items() if self._reserved_agents.get(k) == agent_id) + reservation
-                if agent_committed > self._agent_limits[agent_id]:
-                    self._agent_stops[agent_id] = "dollars"
+        # Admission and reservation happen atomically under the lock, so
+        # concurrent requests cannot oversubscribe the budget. The upstream
+        # call itself runs without the lock; its reservation stays counted
+        # until the response is settled.
+        with self._in_flight:
+            with self._lock:
+                if self._deadline is not None and time.monotonic() >= self._deadline:
+                    self._stop_reason = "deadline"
                     self._persist_locked()
+                    self._error(handler, 402, "episode deadline reached")
+                    return
+                if self._stop_reason:
+                    self._error(handler, 402, "remaining budget exhausted: " + self._stop_reason)
+                    return
+                if agent_id in self._agent_stops:
                     self._error(handler, 402, "agent budget exhausted")
                     return
-            if self._max_tokens is not None and sum(e["tokens"] for e in self._entries) + sum(self._reserved_tokens.values()) + token_reservation > self._max_tokens:
-                self._stop_reason = "tokens"
-                self._persist_locked()
-                self._error(handler, 402, "remaining budget exhausted: tokens")
-                return
-            committed = self._spent + sum(self._reserved.values()) + reservation + CONTINGENCY_USD
-            if committed > self._limit:
-                self._stop_reason = "dollars"
-                self._persist_locked()
-                self._error(handler, 402, "request exceeds remaining budget")
-                return
-            self._reserved[request_id] = reservation
-            self._reserved_agents[request_id] = agent_id
-            self._reserved_tokens[request_id] = token_reservation
-            try:
-                # Persist before dispatch so a process crash while the upstream
-                # call is in flight leaves a conservative reservation behind.
-                self._persist_locked()
-            except Exception:
-                self._mark_uncertain_locked(request_id)
-                self._error(handler, 503, "could not persist budget reservation; dispatch disabled")
-                return
+                if self._accounting_uncertain:
+                    self._error(handler, 503, "accounting is uncertain; dispatch disabled")
+                    return
+                if self._agent_limits:
+                    agent_committed = sum(e["cost"] for e in self._entries if e.get("agent") == agent_id) + sum(v for k, v in self._reserved.items() if self._reserved_agents.get(k) == agent_id) + reservation
+                    if agent_committed > self._agent_limits[agent_id]:
+                        self._agent_stops[agent_id] = "dollars"
+                        self._persist_locked()
+                        self._error(handler, 402, "agent budget exhausted")
+                        return
+                if self._max_tokens is not None and sum(e["tokens"] for e in self._entries) + sum(self._reserved_tokens.values()) + token_reservation > self._max_tokens:
+                    self._stop_reason = "tokens"
+                    self._persist_locked()
+                    self._error(handler, 402, "remaining budget exhausted: tokens")
+                    return
+                committed = self._spent + sum(self._reserved.values()) + reservation + CONTINGENCY_USD
+                if committed > self._limit:
+                    self._stop_reason = "dollars"
+                    self._persist_locked()
+                    self._error(handler, 402, "request exceeds remaining budget")
+                    return
+                self._reserved[request_id] = reservation
+                self._reserved_agents[request_id] = agent_id
+                self._reserved_tokens[request_id] = token_reservation
+                try:
+                    # Persist before dispatch so a process crash while the upstream
+                    # call is in flight leaves a conservative reservation behind.
+                    self._persist_locked()
+                except Exception:
+                    self._mark_uncertain_locked(request_id)
+                    self._error(handler, 503, "could not persist budget reservation; dispatch disabled")
+                    return
             url = f"{self._upstream_url}/chat/completions"
             forwarded_headers = {
                 "Authorization": f"Bearer {self.__key}",
@@ -474,6 +483,7 @@ class BudgetGateway:
                 method="POST",
                 headers=forwarded_headers,
             )
+            failure: BaseException | None = None
             try:
                 with urllib.request.urlopen(upstream_request, timeout=UPSTREAM_TIMEOUT_SECONDS) as response:
                     upstream_body = response.read(MAX_RESPONSE_BYTES + 1)
@@ -496,23 +506,28 @@ class BudgetGateway:
                         raise ValueError("invalid token count")
                 except Exception as exc:
                     raise RuntimeError("usage_missing_or_invalid") from exc
-                if alias_python:
-                    for choice in response_json.get("choices", []):
-                        for call in choice.get("message", {}).get("tool_calls", []):
-                            fn = call.get("function", {})
-                            if fn.get("name") == "execute_python": fn["name"] = "python"
-                    upstream_body = json.dumps(response_json, ensure_ascii=False).encode("utf-8")
-                upstream_id = response_json.get("id", "")
-                if not isinstance(upstream_id, str):
-                    upstream_id = ""
-                row = {
-                    "model": model,
-                    "agent": agent_id,
-                    "id": upstream_id[:200],
-                    "cost": cost,
-                    "tokens": tokens,
-                    "time": datetime.now(timezone.utc).isoformat(),
-                }
+            except BaseException as exc:  # noqa: BLE001 - settled below under the lock
+                failure = exc
+
+        if failure is None:
+            if alias_python:
+                for choice in response_json.get("choices", []):
+                    for call in choice.get("message", {}).get("tool_calls", []):
+                        fn = call.get("function", {})
+                        if fn.get("name") == "execute_python": fn["name"] = "python"
+                upstream_body = json.dumps(response_json, ensure_ascii=False).encode("utf-8")
+            upstream_id = response_json.get("id", "")
+            if not isinstance(upstream_id, str):
+                upstream_id = ""
+            row = {
+                "model": model,
+                "agent": agent_id,
+                "id": upstream_id[:200],
+                "cost": cost,
+                "tokens": tokens,
+                "time": datetime.now(timezone.utc).isoformat(),
+            }
+            with self._lock:
                 if cost > reservation or tokens > token_reservation:
                     self._stop_reason = "reservation_exceeded"
                 self._spent += cost
@@ -521,27 +536,34 @@ class BudgetGateway:
                 self._reserved_agents.pop(request_id, None)
                 self._reserved_tokens.pop(request_id, None)
                 self._persist_locked()
-                self._reply(handler, upstream_status, upstream_body)
-            except urllib.error.HTTPError as exc:
-                try:
-                    detail=json.loads(exc.read(8192)).get('error',{})
-                    message=json.dumps(detail)[:7500].replace(self.__key,'[redacted]')
-                except Exception: message='unavailable'
+            self._reply(handler, upstream_status, upstream_body)
+            return
+
+        exc = failure
+        if isinstance(exc, urllib.error.HTTPError):
+            try:
+                detail=json.loads(exc.read(8192)).get('error',{})
+                message=json.dumps(detail)[:7500].replace(self.__key,'[redacted]')
+            except Exception: message='unavailable'
+            with self._lock:
                 self._atomic_write(self._outdir/'last-error.json',json.dumps({'type':'HTTPError','status':exc.code,'message':message,'model':model}))
                 self._mark_uncertain_locked(request_id)
-                self._error(handler, 502, f"upstream request failed ({exc.code}); accounting uncertain")
-            except Exception as exc:
-                self._atomic_write(self._outdir/'last-error.json',json.dumps({'type':type(exc).__name__,'reason_type':type(getattr(exc,'reason',None)).__name__,'message':str(exc)[:500].replace(self.__key,'[redacted]'),'model':model}))
-                self._mark_uncertain_locked(request_id)
-                if str(exc).startswith("upstream_status_"):
-                    code = str(exc).rsplit("_", 1)[-1]
-                    self._error(handler, 502, f"upstream request failed ({code}); accounting uncertain")
-                elif str(exc) == "response_too_large":
-                    self._error(handler, 502, "upstream response too large; accounting uncertain")
-                elif str(exc) == "usage_missing_or_invalid":
-                    self._error(handler, 502, "upstream usage missing or invalid; accounting uncertain")
-                else:
-                    self._error(handler, 502, "upstream request failed; accounting uncertain")
+            self._error(handler, 502, f"upstream request failed ({exc.code}); accounting uncertain")
+            return
+        with self._lock:
+            self._atomic_write(self._outdir/'last-error.json',json.dumps({'type':type(exc).__name__,'reason_type':type(getattr(exc,'reason',None)).__name__,'message':str(exc)[:500].replace(self.__key,'[redacted]'),'model':model}))
+            self._mark_uncertain_locked(request_id)
+        if str(exc).startswith("upstream_status_"):
+            code = str(exc).rsplit("_", 1)[-1]
+            self._error(handler, 502, f"upstream request failed ({code}); accounting uncertain")
+        elif str(exc) == "response_too_large":
+            self._error(handler, 502, "upstream response too large; accounting uncertain")
+        elif str(exc) == "usage_missing_or_invalid":
+            self._error(handler, 502, "upstream usage missing or invalid; accounting uncertain")
+        else:
+            self._error(handler, 502, "upstream request failed; accounting uncertain")
+        if not isinstance(exc, Exception):
+            raise exc
 
     def _mark_uncertain_locked(self, request_id: str) -> None:
         self._accounting_uncertain = True

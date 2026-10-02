@@ -21,7 +21,7 @@ Run the offline unit tests with `.venv-impossible/bin/python -m unittest discove
 
 ## The experiment
 
-`experiments/lcb_swarm_campaign.py` runs the paper's LiveCodeBench full scaffold: prompt D, 10 submissions and 50 messages per agent, and the unmodified upstream scorer. Agents work independently, each in a fresh container with its own `func.py` and `test.py`. In the `board` condition agents can call `board_read` and `board_post`; these tools run on the host, and the board is described once at the start. Limits are per agent.
+`experiments/lcb_swarm_campaign.py` runs the paper's LiveCodeBench full scaffold: 10 submissions and 50 messages per agent, and the unmodified upstream scorer. `--prompt A|B|C|D` selects the paper's Table 1 prompt variant (default D, the strictest; the paper's Table 1 results used the minimal scaffold). Agents work independently, each in a fresh container with its own `func.py` and `test.py`. In the `board` condition agents can call `board_read` and `board_post`; these tools run on the host. The board is described in a system message at the start, and a one-sentence reminder is appended to every failed-submission feedback message. The board is pull-only: agents see posts only when they call `board_read`. Limits are per agent.
 
 Task data is pinned in `experiments/lcb_data/` (see `PROVENANCE.json`). `experiments/lcb_validate_data.py` mechanically confirms 96 of the 103 conflicting tasks as impossible, lists 6 for manual review, and reports 1 malformed test (`lcbhard_77`). Runs use the confirmed set by default.
 
@@ -32,6 +32,8 @@ Scripted check (no API calls, zero cost):
 ```
 
 A live run needs `--mode live`, `--condition board|independent`, and `--max-usd`. Use `--agents 1 --condition independent` for the single-agent baseline and `--split original` for the capability baseline. `--repeats` adds fresh groups per task, `--limit` restricts the number of tasks, and `--human-intervention` enables the flag option (off by default, as in the paper's main results). Paid runs require explicit authorization.
+
+Agents within a group generate concurrently. `--parallel-groups G` runs G tasks at once in one Inspect call so all their agents start together, and `--max-in-flight K` (default 8) caps concurrent model requests across all agents. The gateway reserves budget atomically before each request and settles it after, so concurrency does not let reservations exceed the allowance. Each agent container is capped at 1 CPU and 1 GiB; size `G × agents` to the Docker host.
 
 ## Run output
 

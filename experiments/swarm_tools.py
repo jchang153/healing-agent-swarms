@@ -88,10 +88,10 @@ class SharedBoard:
 
 
 class FairScheduler:
-    """FIFO scheduler allowing one complete generate call at a time."""
+    """FIFO scheduler allowing up to ``max_concurrent`` generate calls at a time."""
 
     def __init__(self, agent_ids: list[str] | tuple[str, ...], max_turns: int,
-                 seconds: float) -> None:
+                 seconds: float, max_concurrent: int = 1) -> None:
         ids = tuple(agent_ids)
         if not ids or len(set(ids)) != len(ids) or any(not isinstance(x, str) or not x for x in ids):
             raise ValueError("agent_ids must contain unique, non-empty strings")
@@ -99,11 +99,14 @@ class FairScheduler:
             raise ValueError("max_turns must be a positive integer")
         if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or not math.isfinite(seconds) or seconds <= 0:
             raise ValueError("seconds must be positive and finite")
+        if isinstance(max_concurrent, bool) or not isinstance(max_concurrent, int) or max_concurrent < 1:
+            raise ValueError("max_concurrent must be a positive integer")
         self.agent_ids = ids
+        self.max_concurrent = max_concurrent
         self.max_turns = max_turns
         self.seconds = float(seconds)
         self._deadline: float | None = None
-        self._owner: str | None = None
+        self._owners: set[str] = set()
         self._queue: deque[str] = deque()
         self._condition = asyncio.Condition()
         self._turns = {agent: 0 for agent in ids}
@@ -123,7 +126,7 @@ class FairScheduler:
             if self._turns[agent_id] >= self.max_turns:
                 self._status[agent_id] = "limit"
                 return False
-            if agent_id not in self._queue and self._owner != agent_id:
+            if agent_id not in self._queue and agent_id not in self._owners:
                 self._queue.append(agent_id)
             if self._status[agent_id] in ("waiting", "running"):
                 self._status[agent_id] = "waiting"
@@ -137,9 +140,9 @@ class FairScheduler:
                     self._status[agent_id] = "time_limit"
                     self._condition.notify_all()
                     return False
-                if self._owner is None and self._queue and self._queue[0] == agent_id:
+                if len(self._owners) < self.max_concurrent and self._queue and self._queue[0] == agent_id:
                     self._queue.popleft()
-                    self._owner = agent_id
+                    self._owners.add(agent_id)
                     self._status[agent_id] = "running"
                     self._turns[agent_id] += 1
                     return True
@@ -159,8 +162,7 @@ class FairScheduler:
 
     async def release(self, agent_id: str) -> None:
         async with self._condition:
-            if self._owner == agent_id:
-                self._owner = None
+            self._owners.discard(agent_id)
             if self._status.get(agent_id) == "running":
                 self._status[agent_id] = "waiting"
             self._condition.notify_all()
@@ -170,8 +172,7 @@ class FairScheduler:
             return
         async with self._condition:
             self._remove_waiter(agent_id)
-            if self._owner == agent_id:
-                self._owner = None
+            self._owners.discard(agent_id)
             # Keep a quota/deadline result set by acquire() visible after the
             # wrapped solver returns its best available state for scoring.
             if self._status[agent_id] in ("waiting", "running"):

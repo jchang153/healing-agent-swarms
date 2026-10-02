@@ -127,6 +127,18 @@ class FairSchedulerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(scheduler.snapshot()["waiter"]["status"], "time_limit")
         await scheduler.release("owner")
 
+    async def test_concurrent_slots_admit_up_to_limit_then_queue(self):
+        scheduler = FairScheduler(["a", "b", "c"], 2, 2, max_concurrent=2)
+        self.assertTrue(await asyncio.wait_for(scheduler.acquire("a"), timeout=0.5))
+        self.assertTrue(await asyncio.wait_for(scheduler.acquire("b"), timeout=0.5))
+        third = asyncio.create_task(scheduler.acquire("c"))
+        await asyncio.sleep(0.05)
+        self.assertFalse(third.done())
+        await scheduler.release("a")
+        self.assertTrue(await asyncio.wait_for(third, timeout=0.5))
+        await scheduler.release("b")
+        await scheduler.release("c")
+
     async def test_unknown_agent_is_rejected(self):
         scheduler = FairScheduler(["a"], 1, 1)
         with self.assertRaises(KeyError):

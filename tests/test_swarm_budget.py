@@ -1,5 +1,5 @@
 """Pre-dispatch limits tested without network or credentials."""
-import io,json,tempfile,time,unittest
+import io,json,tempfile,threading,time,unittest
 from pathlib import Path
 from unittest.mock import patch
 from experiments.impossible_budget import BudgetGateway
@@ -72,5 +72,51 @@ class SwarmBudgetTests(unittest.TestCase):
  def test_unknown_stored_agent_fails_closed(self):
   (self.out/'usage.jsonl').write_text(json.dumps({'model':'openai/gpt-5','id':'fake','agent':'unknown','cost':.01,'tokens':1,'time':'test'})+'\n')
   self.assertTrue(self.gateway().snapshot()['accounting_uncertain'])
+
+
+class ConcurrentDispatchTests(unittest.TestCase):
+ """The lock covers reservation and settlement only, never the upstream call."""
+ def setUp(self):self.tmp=tempfile.TemporaryDirectory();self.out=Path(self.tmp.name)
+ def tearDown(self):self.tmp.cleanup()
+ def run_pair(self,g,upstream):
+  handlers=[Handler('A'),Handler('B')]
+  with patch('experiments.impossible_budget.urllib.request.urlopen',side_effect=upstream):
+   threads=[threading.Thread(target=g._handle_post,args=(h,)) for h in handlers]
+   [t.start() for t in threads];[t.join(10) for t in threads]
+  return handlers
+ def test_two_requests_are_in_flight_together(self):
+  barrier=threading.Barrier(2,timeout=5)
+  def upstream(*args,**kwargs):barrier.wait();return Response()  # Deadlocks if serialized.
+  g=BudgetGateway('dummy-test-key',self.out,20,agent_limits={'A':2,'B':2},max_in_flight=2)
+  handlers=self.run_pair(g,upstream)
+  self.assertEqual([h.status for h in handlers],[200,200]);self.assertFalse(barrier.broken)
+  snap=g.snapshot();self.assertAlmostEqual(snap['spent_usd'],.14);self.assertEqual(snap['reserved_usd'],0)
+ def test_in_flight_cap_limits_overlap(self):
+  active=[0,0];lock=threading.Lock()
+  def upstream(*args,**kwargs):
+   with lock:active[0]+=1;active[1]=max(active[1],active[0])
+   time.sleep(.2)
+   with lock:active[0]-=1
+   return Response()
+  g=BudgetGateway('dummy-test-key',self.out,20,agent_limits={'A':2,'B':2},max_in_flight=1)
+  handlers=self.run_pair(g,upstream)
+  self.assertEqual([h.status for h in handlers],[200,200]);self.assertEqual(active[1],1)
+ def test_concurrent_requests_cannot_oversubscribe(self):
+  probe=BudgetGateway('dummy-test-key',self.out/'probe',20)
+  one=probe._estimate('openai/gpt-5',len(Handler().rfile.getvalue()),8192)
+  release=threading.Event()
+  def upstream(*args,**kwargs):release.wait(5);return Response(cost=.01,tokens=100)
+  # Room for exactly one reservation plus the contingency.
+  g=BudgetGateway('dummy-test-key',self.out,.5+one*1.5,agent_limits={'A':2,'B':2},max_in_flight=2)
+  handlers=[Handler('A'),Handler('B')]
+  with patch('experiments.impossible_budget.urllib.request.urlopen',side_effect=upstream) as mocked:
+   first=threading.Thread(target=g._handle_post,args=(handlers[0],));first.start()
+   for _ in range(100):
+    if g.snapshot()['reserved_usd']>0:break
+    time.sleep(.01)
+   g._handle_post(handlers[1])  # Arrives while the first is in flight.
+   self.assertEqual(handlers[1].status,402)
+   release.set();first.join(10)
+   self.assertEqual(handlers[0].status,200);self.assertEqual(mocked.call_count,1)
 
 if __name__=='__main__':unittest.main()
