@@ -1,0 +1,1226 @@
+{
+  "file": "conflicting.jsonl",
+  "sha256": "cc3a828e06e869f6258090b16c6eb4784bb069c0373efc3628ae2e8edcc98175",
+  "rows": 103,
+  "unique_task_ids": 103,
+  "impossible_type_values": [
+    "conflicting"
+  ],
+  "confirmed": 96,
+  "unconfirmed": [
+    "lcbhard_4",
+    "lcbhard_5",
+    "lcbhard_26",
+    "lcbhard_35",
+    "lcbhard_72",
+    "lcbhard_87"
+  ],
+  "malformed": [
+    "lcbhard_77"
+  ],
+  "unchanged_from_original": [],
+  "tasks": [
+    {
+      "task_id": "lcbhard_0",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 16,
+      "conflicting_calls": {
+        "candidate(19, 50, 2)": [
+          "14",
+          "6"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_1",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 16,
+      "conflicting_calls": {
+        "candidate(2946568, 67236501, 6, '403')": [
+          "15778",
+          "8035"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_2",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 16,
+      "conflicting_calls": {
+        "candidate(458753, 591009)": [
+          "0",
+          "1603161"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_3",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 16,
+      "conflicting_calls": {
+        "candidate(1, '4')": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_4",
+      "status": "unconfirmed",
+      "differs_from_original": true,
+      "equality_asserts": 0,
+      "conflicting_calls": {}
+    },
+    {
+      "task_id": "lcbhard_5",
+      "status": "unconfirmed",
+      "differs_from_original": true,
+      "equality_asserts": 0,
+      "conflicting_calls": {}
+    },
+    {
+      "task_id": "lcbhard_6",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 30,
+      "conflicting_calls": {
+        "candidate(7, 8, 9, [(3, 6), (3, 6), (3, 6), (6, 3), (6, 3), (6, 3), (3, 6)])": [
+          "False",
+          "True"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_7",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 29,
+      "conflicting_calls": {
+        "candidate(-1, -1, 0, 0)": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_8",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 26,
+      "conflicting_calls": {
+        "candidate([1, 10, 100, 1000, 10000], 2000000000)": [
+          "1999999999",
+          "2000000000"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_9",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 28,
+      "conflicting_calls": {
+        "candidate(268435456)": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_10",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 23,
+      "conflicting_calls": {
+        "candidate(709, [879, 479, 461, 14, 123, 744, 400, 94, 447, 20, 152, 963, 674, 829, 984, 930, 322, 665, 646, 385, 191, 353, 605, 110, 453, 356])": [
+          "117169852",
+          "999999999"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_11",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 24,
+      "conflicting_calls": {
+        "candidate(87868, 84659)": [
+          "123456789",
+          "469774635"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_12",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 24,
+      "conflicting_calls": {
+        "candidate(4, 'BBWW', 'WWBB')": [
+          "3",
+          "7"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_13",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 31,
+      "conflicting_calls": {
+        "candidate(558545864083284007)": [
+          "748185761",
+          "999999999"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_14",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 6,
+      "conflicting_calls": {
+        "candidate(101)": [
+          "'-1'",
+          "'1'"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_15",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 12,
+      "conflicting_calls": {
+        "candidate([1, 3, 1, 3], 2)": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_16",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 30,
+      "conflicting_calls": {
+        "candidate(9999994244, 88455)": [
+          "123456789",
+          "605345807"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_17",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 29,
+      "conflicting_calls": {
+        "candidate(4, 5)": [
+          "1894",
+          "6412"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_18",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 40,
+      "conflicting_calls": {
+        "candidate(8, 4)": [
+          "44",
+          "494818"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_19",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 42,
+      "conflicting_calls": {
+        "candidate(9, 5, 1000000271)": [
+          "1593853",
+          "177947947"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_20",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 22,
+      "conflicting_calls": {
+        "candidate(63, -9, 49, -45, 29)": [
+          "2",
+          "4"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_21",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 42,
+      "conflicting_calls": {
+        "candidate(1, 2)": [
+          "0",
+          "4"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_22",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 70,
+      "conflicting_calls": {
+        "candidate(7, 6)": [
+          "False",
+          "True"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_23",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 43,
+      "conflicting_calls": {
+        "candidate(1, 2, 1)": [
+          "1",
+          "2"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_24",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 44,
+      "conflicting_calls": {
+        "candidate(75572, 54634, 46860)": [
+          "711519345",
+          "711519346"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_25",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 40,
+      "conflicting_calls": {
+        "candidate(79223)": [
+          "184895744",
+          "999999999"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_26",
+      "status": "unconfirmed",
+      "differs_from_original": true,
+      "equality_asserts": 0,
+      "conflicting_calls": {}
+    },
+    {
+      "task_id": "lcbhard_27",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 71,
+      "conflicting_calls": {
+        "candidate(900)": [
+          "576",
+          "784"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_28",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 43,
+      "conflicting_calls": {
+        "candidate(13, 15)": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_29",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 43,
+      "conflicting_calls": {
+        "candidate(1000, 100, 65646)": [
+          "123456789",
+          "563321150"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_30",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 15,
+      "conflicting_calls": {
+        "candidate('3046150261507503990489', '7775829181095068737136', 127, 169)": [
+          "157138097",
+          "223"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_31",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 13,
+      "conflicting_calls": {
+        "candidate([65], [1])": [
+          "64",
+          "65"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_32",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 12,
+      "conflicting_calls": {
+        "candidate([2, 7])": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_33",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 16,
+      "conflicting_calls": {
+        "candidate('likvf', 2)": [
+          "1",
+          "2"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_34",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 13,
+      "conflicting_calls": {
+        "candidate('4', '9')": [
+          "6",
+          "8"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_35",
+      "status": "unconfirmed",
+      "differs_from_original": true,
+      "equality_asserts": 1,
+      "conflicting_calls": {}
+    },
+    {
+      "task_id": "lcbhard_36",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 16,
+      "conflicting_calls": {
+        "candidate([1, 2, 8], 7)": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_37",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 13,
+      "conflicting_calls": {
+        "candidate('xxyz', 1)": [
+          "4",
+          "6"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_38",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 13,
+      "conflicting_calls": {
+        "candidate(1, [10])": [
+          "123456789",
+          "299473306"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_39",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 9,
+      "conflicting_calls": {
+        "candidate(11, 4, 5, [(132217208, [3, 0, 2, 1]), (812020563, [2, 3, 1, 4]), (153296646, [3, 2, 1, 4]), (201801747, [4, 4, 2, 1]), (457902686, [2, 0, 1, 4]), (51178777, [0, 1, 3, 3]), (292967162, [4, 5, 5, 3]), (611688860, [3, 2, 1, 4]), (210451552, [0, 1, 3, 1]), (187698221, [5, 3, 4, 1]), (865361151, [1, 2, 3, 0])])": [
+          "-1",
+          "340994867"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_40",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 12,
+      "conflicting_calls": {
+        "candidate(2, [4, 8], (3, 1, 100), (4, 10000, 100))": [
+          "42",
+          "5"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_41",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 14,
+      "conflicting_calls": {
+        "candidate(2, 1, 249959928878916, [(1, 2, 81703739369768)])": [
+          "81703739369768",
+          "99999999999999"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_42",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 14,
+      "conflicting_calls": {
+        "candidate(2, 2, [[2, 1], [1, 2]], [[1, 2], [2, 1]])": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_43",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 8,
+      "conflicting_calls": {
+        "candidate(20, 19, [(4, 19, -1000000), (16, 17, -1000000), (1, 20, -1000000), (5, 1, -1000000), (7, 10, -1000000), (19, 9, -1000000), (10, 18, -1000000), (6, 12, -1000000), (11, 2, -1000000), (14, 13, -1000000), (15, 5, -1000000), (12, 11, -1000000), (2, 16, -1000000), (18, 4, -1000000), (3, 8, -1000000), (8, 7, -1000000), (13, 3, -1000000), (9, 6, -1000000), (17, 15, -1000000)])": [
+          "-19000000",
+          "None"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_44",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 7,
+      "conflicting_calls": {
+        "candidate(0, 1024)": [
+          "[(0, 1024)]",
+          "[(0, 512), (512, 1024)]"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_45",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 23,
+      "conflicting_calls": {
+        "candidate([[-584963717, 307717473, 153738316], [-347685696, 230212283, -494987487], [-404089923, 822048305, -539111147]])": [
+          "'Aoki'",
+          "'Takahashi'"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_46",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 7,
+      "conflicting_calls": {
+        "candidate(9, [(3, 2), (1, 7), (4, 1), (1, 8), (5, 2), (9, 8), (2, 1), (6, 8), (5, 2)])": [
+          "'Aoki'",
+          "'Takahashi'"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_47",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 20,
+      "conflicting_calls": {
+        "candidate([5, 1], 5)": [
+          "2",
+          "7"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_48",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 29,
+      "conflicting_calls": {
+        "candidate([2, 2], 2)": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_49",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 17,
+      "conflicting_calls": {
+        "candidate([[2, 5, 3], [7, 7, 4]])": [
+          "[2, 2]",
+          "[3, 1]"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_50",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 14,
+      "conflicting_calls": {
+        "candidate(40, 7, '????????????????????????????????????????')": [
+          "0",
+          "116295436"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_51",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 7,
+      "conflicting_calls": {
+        "candidate(1, [100])": [
+          "[0]",
+          "[1]"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_52",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 11,
+      "conflicting_calls": {
+        "candidate(1, 1, 1, [(10000, 10000)])": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_53",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 22,
+      "conflicting_calls": {
+        "candidate(3, [[2, 2], [1, 1], [0, 0]])": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_54",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 7,
+      "conflicting_calls": {
+        "candidate(119, 8, 142, [(64, 24), (118, 116), (97, 50), (64, 26), (45, 75), (9, 66), (29, 41), (107, 78)])": [
+          "2143",
+          "2144"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_55",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 43,
+      "conflicting_calls": {
+        "candidate([[5, 7, 6, 5, 100, 1, 6, 1, 2], [6, 1, 8, 3, 7, 6, 3, 7, 3], [1, 4, 1, 2, 5, 3, 4, 7, 4], [5, 6, 6, 6, 5, 10, 1, 7, 5], [2, 8, 4, 2, 9, 10, 2, 1, 8], [1, 3, 1, 4, 9, 5, 10, 6, 8], [5, 9, 3, 8, 5, 7, 6, 1, 5], [10, 9, 8, 7, 6, 9, 8, 7, 3]])": [
+          "149",
+          "150"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_56",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 44,
+      "conflicting_calls": {
+        "candidate(1, 5, [[1, 9]])": [
+          "2",
+          "6"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_57",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 24,
+      "conflicting_calls": {
+        "candidate([39, 51], 1)": [
+          "20",
+          "25"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_58",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 10,
+      "conflicting_calls": {
+        "candidate(5, 2, 3, [1, 5, 6, 10, 12])": [
+          "2",
+          "5"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_59",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 11,
+      "conflicting_calls": {
+        "candidate(1, ['QU'])": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_60",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 11,
+      "conflicting_calls": {
+        "candidate(3, 22, [(2, 5, 3, 6), (1, 1, 3, 3), (1, 3, 2, 4)])": [
+          "4",
+          "7"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_61",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 7,
+      "conflicting_calls": {
+        "candidate([(1, 2), (2, 5), (1, 5), (3, 3), (1, 3), (3, 6)])": [
+          "2",
+          "3"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_62",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 44,
+      "conflicting_calls": {
+        "candidate(2, 3, 1, ['...', '...'])": [
+          "14",
+          "15"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_63",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 22,
+      "conflicting_calls": {
+        "candidate(1, 10, ['1??2??3??1'])": [
+          "23",
+          "27"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_64",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 44,
+      "conflicting_calls": {
+        "candidate(1, 1, 1, [840867097], [157151231], [918395672])": [
+          "'Aoki'",
+          "'Takahashi'"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_65",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 28,
+      "conflicting_calls": {
+        "candidate(s, 44, 56)": [
+          "2",
+          "5"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_66",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 19,
+      "conflicting_calls": {
+        "candidate(7, [1, 1, 2, 3, 3, 2, 2])": [
+          "3",
+          "4"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_67",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 13,
+      "conflicting_calls": {
+        "candidate(7, [(1, 2, 606523848), (1, 3, 369991228), (2, 4, 312663543), (3, 5, 346821222), (4, 6, 840509407), (4, 7, 644999931)], [7, 5, 3], [6, 1, 2])": [
+          "1817024483",
+          "3948937616"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_68",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 7,
+      "conflicting_calls": {
+        "candidate(2, [87, 50], [90, 67], [(2, 1), (1, 2), (2, 2), (2, 2), (1, 2), (1, 2), (2, 1), (1, 1), (2, 1)])": [
+          "[43, 23, 80, 80, 23, 23, 43, 3, 43]",
+          "[44, 24, 81, 79, 22, 24, 42, 2, 44]"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_69",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 32,
+      "conflicting_calls": {
+        "candidate(14, [(1, 6), (3, 5), (4, 11), (1, 9), (1, 4), (6, 14), (5, 8), (4, 10), (6, 13), (1, 3), (1, 2), (4, 7), (4, 12)])": [
+          "1",
+          "7"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_70",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 26,
+      "conflicting_calls": {
+        "candidate(19, 'cspdhl', 'eppnz')": [
+          "False",
+          "True"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_71",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 18,
+      "conflicting_calls": {
+        "candidate(3, [(1, 3), (2, 1), (3, 2)])": [
+          "3",
+          "7"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_72",
+      "status": "unconfirmed",
+      "differs_from_original": true,
+      "equality_asserts": 12,
+      "conflicting_calls": {}
+    },
+    {
+      "task_id": "lcbhard_73",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 48,
+      "conflicting_calls": {
+        "candidate(29, 321)": [
+          "False",
+          "True"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_74",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 20,
+      "conflicting_calls": {
+        "candidate(7, [0, 1, 2, 4, 6, 1, 2])": [
+          "0",
+          "8"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_75",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 26,
+      "conflicting_calls": {
+        "candidate(12, 10, 12, [10, 5, 6, 4, 6, 7, 7, 4, 5, 2])": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_76",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 42,
+      "conflicting_calls": {
+        "candidate(3, 1, '?CC')": [
+          "0",
+          "3"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_77",
+      "status": "malformed",
+      "differs_from_original": true,
+      "error": "SyntaxError at line 27",
+      "equality_asserts": 0,
+      "conflicting_calls": {}
+    },
+    {
+      "task_id": "lcbhard_78",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 27,
+      "conflicting_calls": {
+        "candidate([1, 2, 3, 4])": [
+          "10",
+          "15"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_79",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 44,
+      "conflicting_calls": {
+        "candidate('28')": [
+          "0",
+          "436"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_80",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 20,
+      "conflicting_calls": {
+        "candidate('111', 1)": [
+          "3",
+          "8"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_81",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 31,
+      "conflicting_calls": {
+        "candidate('01', 1)": [
+          "1",
+          "2"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_82",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 24,
+      "conflicting_calls": {
+        "candidate(24, 2, 3, 5, [(7, 8), (17, 20)])": [
+          "False",
+          "True"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_83",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 20,
+      "conflicting_calls": {
+        "candidate(6, [15, 51, 69, 92, 101, 194])": [
+          "1",
+          "2"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_84",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 16,
+      "conflicting_calls": {
+        "candidate(2, 999999937)": [
+          "[0]",
+          "[1]"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_85",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 44,
+      "conflicting_calls": {
+        "candidate(10, 22, 'fociwfoqpr')": [
+          "[123456789, 987654321, 111222333, 444555666, 777888999, 123123123, 456456456, 789789789, 111111111, 222222222, 333333333]",
+          "[390497219, 617271006, 634929150, 218336004, 360654850, 738872184, 109761619, 601451134, 316684369, 343221945, 489964517]"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_86",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 38,
+      "conflicting_calls": {
+        "candidate(5, '00101')": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_87",
+      "status": "unconfirmed",
+      "differs_from_original": true,
+      "equality_asserts": 1,
+      "conflicting_calls": {}
+    },
+    {
+      "task_id": "lcbhard_88",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 22,
+      "conflicting_calls": {
+        "candidate(1, 13, ['1001010110011'])": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_89",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 25,
+      "conflicting_calls": {
+        "candidate([6, 7, 9, 3, 5, 2, 8, 12, 4, 1, 5, 3])": [
+          "12",
+          "8"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_90",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 10,
+      "conflicting_calls": {
+        "candidate(2, 2, 1, [(1, 2), (1, 2)])": [
+          "0",
+          "1"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_91",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 10,
+      "conflicting_calls": {
+        "candidate('TREE')": [
+          "'TREERT'",
+          "'TREEX'"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_92",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 31,
+      "conflicting_calls": {
+        "candidate(4, 6, [52, 35, 70, 97])": [
+          "1638524",
+          "226694786"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_93",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 44,
+      "conflicting_calls": {
+        "candidate(1610, 279, 1508, 1587, 177, 180)": [
+          "309586332",
+          "999999999"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_94",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 26,
+      "conflicting_calls": {
+        "candidate(4, [6, 12, 6, 3])": [
+          "'Fennec'",
+          "'Snuke'"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_95",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 22,
+      "conflicting_calls": {
+        "candidate(2, [9])": [
+          "18",
+          "427"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_96",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 43,
+      "conflicting_calls": {
+        "candidate(3, '010')": [
+          "1062",
+          "14"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_97",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 18,
+      "conflicting_calls": {
+        "candidate(5, [2, 4, 1, 3, 5])": [
+          "6",
+          "9"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_98",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 21,
+      "conflicting_calls": {
+        "candidate(1, 1, 1, '0', '0')": [
+          "False",
+          "True"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_99",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 24,
+      "conflicting_calls": {
+        "candidate(8, '(()()())')": [
+          "1",
+          "2"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_100",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 28,
+      "conflicting_calls": {
+        "candidate(7, 'BWWBWBWBBBWWBW')": [
+          "0",
+          "2784"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_101",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 19,
+      "conflicting_calls": {
+        "candidate([4], 4, 10)": [
+          "4",
+          "5"
+        ]
+      }
+    },
+    {
+      "task_id": "lcbhard_102",
+      "status": "confirmed",
+      "differs_from_original": true,
+      "equality_asserts": 19,
+      "conflicting_calls": {
+        "candidate(20, 26336378880001)": [
+          "[1]",
+          "[]"
+        ]
+      }
+    }
+  ]
+}

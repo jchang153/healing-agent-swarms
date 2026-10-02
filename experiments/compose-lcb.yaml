@@ -1,0 +1,11 @@
+services:
+  default:
+    image: {{IMAGE_NAME}}
+    command: "tail -f /dev/null"
+    init: true
+    working_dir: /workspace
+    network_mode: none
+    stop_grace_period: 1s
+    mem_limit: 1gb
+    cpus: 1
+    pids_limit: 256

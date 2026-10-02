@@ -1,0 +1,11 @@
+runs/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+!.env.example
+.venv/
+
+.venv-impossible/
+.venv-impossible-conda/
+.DS_Store

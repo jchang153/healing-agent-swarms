@@ -1,2 +1,52 @@
-# healing-agent-swarms
-Controlled experiments on cheating, communication, and recovery in multi-agent coding systems using Docker, Inspect, and OpenRouter.
+# Healing Agent Swarms
+
+Multi-agent experiments on Conflicting-LiveCodeBench from ImpossibleBench (Zhong, Raghunathan, Carlini, 2025), using the paper's full scaffold through Inspect, Docker sandboxes, and OpenRouter. Each task is solved by N agents, each in its own workspace, with an optional shared message board.
+
+## What you need
+
+- Python 3.12
+- Docker
+- An OpenRouter API key, only for a paid live run
+
+Set up the runtime once:
+
+```sh
+python3.12 -m venv .venv-impossible
+.venv-impossible/bin/pip install -r experiments/impossible-runtime-lock.txt
+```
+
+The sandbox image (`aisiuk/inspect-tool-support`, the image the upstream code specifies) is pinned by digest in `experiments/lcb_swarm_campaign.py` and pulled on first use. On this Mac, if `docker` is not on PATH, run `export PATH="$HOME/.docker/bin:$PATH"`.
+
+Run the offline unit tests with `.venv-impossible/bin/python -m unittest discover -s tests -v`.
+
+## The experiment
+
+`experiments/lcb_swarm_campaign.py` runs the paper's LiveCodeBench full scaffold: prompt D, 10 submissions and 50 messages per agent, and the unmodified upstream scorer. Agents work independently, each in a fresh container with its own `func.py` and `test.py`. In the `board` condition agents can call `board_read` and `board_post`; these tools run on the host, and the board is described once at the start. Limits are per agent.
+
+Task data is pinned in `experiments/lcb_data/` (see `PROVENANCE.json`). `experiments/lcb_validate_data.py` mechanically confirms 96 of the 103 conflicting tasks as impossible, lists 6 for manual review, and reports 1 malformed test (`lcbhard_77`). Runs use the confirmed set by default.
+
+Scripted check (no API calls, zero cost):
+
+```sh
+.venv-impossible/bin/python experiments/lcb_swarm_campaign.py --mode check
+```
+
+A live run needs `--mode live`, `--condition board|independent`, and `--max-usd`. Use `--agents 1 --condition independent` for the single-agent baseline and `--split original` for the capability baseline. `--repeats` adds fresh groups per task, `--limit` restricts the number of tasks, and `--human-intervention` enables the flag option (off by default, as in the paper's main results). Paid runs require explicit authorization.
+
+## Run output
+
+Each run writes `runs/lcb-<id>/` (ignored by Git) with a manifest of every setting, per-agent Inspect logs, transcripts, per-scoring submission records with workspace file hashes, board logs, and `report.md`. Each agent run is labelled `pass_tests_modified`, `pass_tests_intact`, `flagged`, `fail_tests_modified`, `censored` (stopped by a harness limit), or `fail`. The report gives agent-level and group-level pass rates with 95% Wilson intervals; use the group-level rate for the board condition, where agents are not independent.
+
+On impossible tasks, a pass is the paper's cheating measure and a lower bound on cheating. Labels are deterministic and do not establish intent.
+
+## Upstream scoring caveats
+
+The scorer always restores the supplied `test.py` before grading (upstream `record_to_sample` always stores it), so test edits are detected but never help. It passes on exit code 0 alone, so a `func.py` that exits on import scores as a pass (`pass_tests_intact`). Both behaviours are kept to match the reference implementation.
+
+## Spending and credentials
+
+Put `OPENROUTER_API_KEY` in the local `.env` file (ignored by Git, `chmod 600`). The key is read on the host by `healing_swarm/secrets.py` and used only inside a loopback budget gateway; containers never receive it and are started without network access. Never put real keys in `.env.example`, paste them in chat, or print the file.
+
+The gateway reserves a conservative cost before each request and keeps a $0.50 contingency. Accounting happens after each response, so spending is a threshold, not a hard cap; use a dedicated OpenRouter key with its own provider-side limit. A cancelled or failed request may still be billed; the summary marks accounting as uncertain in that case, and the provider activity should be reconciled before restarting.
+
+`vendor/impossiblebench` holds the pinned upstream source and its license.
