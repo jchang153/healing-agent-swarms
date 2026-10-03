@@ -47,6 +47,7 @@ class SharedBoard:
         self.max_messages = max_messages
         self.max_text_length = max_text_length
         self._messages: list[_Message] = []
+        self._delivered: dict[str, set[int]] = {}
         self._lock = RLock()
 
     def _log(self, event: str, **fields: Any) -> None:
@@ -82,9 +83,31 @@ class SharedBoard:
             raise ValueError("since must be a non-negative integer message id")
         with self._lock:
             result = [asdict(item) for item in self._messages if item.id >= since]
+            self._delivered.setdefault(agent_id, set()).update(item["id"] for item in result)
             self._log("board_read", agent=agent_id, since=since,
                       exposed_message_ids=[item["id"] for item in result])
             return result
+
+    def unread(self, agent_id: str) -> list[dict[str, Any]]:
+        """Messages by other agents that ``agent_id`` has not yet received through ``read``."""
+        with self._lock:
+            delivered = self._delivered.get(agent_id, set())
+            return [asdict(item) for item in self._messages
+                    if item.author != agent_id and item.id not in delivered]
+
+    def notice(self, agent_id: str) -> str:
+        """Per-turn status text for ``agent_id``; logs which unread IDs it reported."""
+        if not self.enabled:
+            raise RuntimeError("The shared board is disabled")
+        with self._lock:
+            pending = self.unread(agent_id)
+            self._log("board_notice", agent=agent_id, unread_message_ids=[m["id"] for m in pending])
+        if not pending:
+            return "[Message board status] No unread messages on the shared board."
+        authors = ", ".join(sorted({m["author"] for m in pending}))
+        count = len(pending)
+        return (f"[Message board status] You have {count} unread message{'s' if count != 1 else ''} "
+                f"on the shared board from {authors}. Use board_read to read {'them' if count != 1 else 'it'}.")
 
 
 class FairScheduler:
@@ -263,11 +286,14 @@ def swarm_adapter(inner_solver: Solver, agent_id: str, board: SharedBoard,
                   scheduler: FairScheduler,
                   stop_check: Callable[[str], str | None] | None = None,
                   ready_hook: Callable[[TaskState], Awaitable[None]] | None = None,
-                  model_instance: Any = None) -> Solver:
+                  model_instance: Any = None,
+                  input_hook: Callable[[str, list[Any]], list[Any]] | None = None) -> Solver:
     """Wrap an initialized Inspect solver with board tools and fair generation.
 
     Board access is enabled only when ``board.enabled`` is true. The model never
     supplies its author id: board posts use the trusted ``agent_id`` closure.
+    ``input_hook`` may return an extended copy of each request's messages; the
+    additions are sent to the model but never stored in the conversation.
     """
     if not callable(inner_solver):
         raise TypeError("inner_solver must be an initialized Inspect solver")
@@ -343,6 +369,8 @@ def swarm_adapter(inner_solver: Solver, agent_id: str, board: SharedBoard,
 
             async def intercepted(input, tools=None, **kwargs):
                 from inspect_ai.model import ModelOutput, ChatMessageAssistant, ChatCompletionChoice
+                if input_hook is not None:
+                    input = input_hook(agent_id, list(input))
                 await fair_generate(state, _swarm_model_input=input, **kwargs)
                 if state.completed:
                     return ModelOutput(model=str(model_instance), choices=[ChatCompletionChoice(message=ChatMessageAssistant(content=""), stop_reason="stop")])
