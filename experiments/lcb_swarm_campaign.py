@@ -235,7 +235,7 @@ def scripted_model(agent_id: str, peer_id: str, role: str):
 
 
 def generation_config(args, gateway_agent: str) -> GenerateConfig:
-    return GenerateConfig(max_tokens=args.max_output_tokens, max_retries=0, timeout=330, attempt_timeout=330,
+    return GenerateConfig(max_tokens=args.max_output_tokens, max_retries=0, timeout=600, attempt_timeout=600,
                           max_connections=1, temperature=args.temperature, seed=args.seed,
                           extra_headers={"x-agent-id": gateway_agent},
                           reasoning_effort=args.reasoning_effort if args.model.startswith("openai/") else None,
@@ -380,7 +380,7 @@ async def run_wave(args, wave_dir: Path, groups: list[dict]) -> list[dict]:
             tasks, log_dir=str(wave_dir / "inspect"), max_samples=len(tasks), max_tasks=len(tasks),
             max_sandboxes=len(tasks), max_subprocesses=max(4, len(tasks)), log_level="error", log_model_api=True,
             log_realtime=False, fail_on_error=False, retry_on_error=0,
-            time_limit=math.ceil(args.seconds + 60), max_retries=0), timeout=args.seconds + 330)
+            time_limit=math.ceil(args.seconds + 60), max_retries=0), timeout=args.seconds + 720)
         for log in logs:
             meta = log.eval.metadata or {}
             logs_by_key[(meta.get("group_id"), meta.get("agent_id"))] = log
