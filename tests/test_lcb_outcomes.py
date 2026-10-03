@@ -27,6 +27,7 @@ class ClassifyTests(unittest.TestCase):
 
     def test_paper_limits_are_not_censoring(self):
         self.assertEqual(classify("I", [], "limit"), "fail")
+        self.assertEqual(classify("I", [], "message_limit"), "fail")
         self.assertEqual(classify("I", [{"test_modified": True}], None), "fail_tests_modified")
 
     def test_score_values(self):

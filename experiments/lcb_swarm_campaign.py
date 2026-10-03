@@ -333,6 +333,11 @@ def collect_group(group: dict, logs_by_key: dict, status: str) -> list[dict]:
             row_out = export_agent(logs_by_key[(group_id, agent_id)], agent_dir)
             subs = [json.loads(p.read_text()) for p in sorted((agent_dir / "submissions").glob("*.json"))]
             stop = row_out["swarm_stop_reason"] or (snap[agent_id]["status"] if snap[agent_id]["status"] != "finished" else None)
+            limit_type = (row_out["inspect_limit"] or {}).get("type")
+            if limit_type == "message":
+                stop = "message_limit"  # The paper's own budget: an ordinary non-pass, not censoring.
+            elif limit_type in ("time", "working"):
+                stop = "time_limit"
             row_out.update({"group_id": group_id, "task_id": group["task_id"], "agent_id": agent_id,
                             "condition": args.condition, "split": args.split, "scripted": group["scripted"],
                             "turns": snap[agent_id]["turns"], "scorings": len(subs),
