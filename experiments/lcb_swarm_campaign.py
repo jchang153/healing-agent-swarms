@@ -10,7 +10,7 @@ Default mode is a scripted, zero-cost Docker check. Live mode is opt-in and paid
 """
 from __future__ import annotations
 
-import argparse, asyncio, hashlib, json, logging, math, os, sys, time, uuid
+import argparse, asyncio, hashlib, json, logging, math, os, re, subprocess, sys, time, uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -72,6 +72,40 @@ for base, dirs, files in os.walk('.'):
             out[path] = hashlib.sha256(f.read()).hexdigest()
 print(json.dumps(out))
 """
+
+
+def git_state() -> dict:
+    """Commit and dirty flag of the code used for this run (best effort)."""
+    for git in ("git", "/Library/Developer/CommandLineTools/usr/bin/git"):
+        try:
+            commit = subprocess.run([git, "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True,
+                                    text=True, timeout=10)
+            if commit.returncode != 0:
+                continue
+            dirty = subprocess.run([git, "status", "--porcelain", "--", "experiments", "tests", "healing_swarm"],
+                                   cwd=ROOT, capture_output=True, text=True, timeout=10)
+            return {"git_commit": commit.stdout.strip(), "git_dirty": bool(dirty.stdout.strip())}
+        except (OSError, subprocess.SubprocessError):
+            continue
+    return {"git_commit": None, "git_dirty": None}
+
+
+def default_label(args) -> str:
+    if args.mode == "check":
+        return f"check-{args.board_style}" + ("-abort" if args.human_intervention else "")
+    setup = "single" if args.agents == 1 else args.condition
+    if args.condition == "board":
+        setup += f"-{args.board_style}"
+    return (f"prompt{args.prompt}-{setup}" + ("-abort" if args.human_intervention else "")
+            + f"-{args.agents}x{args.limit or 'all'}")
+
+
+def run_directory(args) -> Path:
+    """Dated, descriptive folder so an alphabetical listing is chronological."""
+    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%MZ")
+    slug = re.sub(r"[^A-Za-z0-9]+", "-", args.label or default_label(args)).strip("-")[:60]
+    base = ROOT / "runs" / ("checks" if args.mode == "check" else "")
+    return base / f"{stamp}_{slug}_{uuid.uuid4().hex[:6]}"
 
 
 def save(path: Path, data) -> None:
@@ -448,7 +482,7 @@ async def run(args) -> Path:
     work.mkdir()
     os.chdir(work)  # Keep Inspect's dotenv discovery away from the repository .env.
     logging.basicConfig(level=logging.ERROR)
-    out = ROOT / "runs" / ("lcb-" + uuid.uuid4().hex[:12])
+    out = run_directory(args)
     out.mkdir(parents=True)
     print("Experiment directory:", out, flush=True)
 
@@ -477,6 +511,7 @@ async def run(args) -> Path:
     validation_path = DATA / "conflicting-validation.json"
     manifest = {
         "started_at": datetime.now(timezone.utc).isoformat(), "mode": args.mode, "scripted": args.mode == "check",
+        "label": args.label or default_label(args), "note": args.note, **git_state(),
         "condition": args.condition if args.mode == "live" else "board+independent controls",
         "split": args.split, "agents_per_group": args.agents, "groups": [g for g, *_ in groups],
         "tasks": sorted({t for _, _, t, _ in groups}), "repeats_per_task": args.repeats if args.mode == "live" else 1,
@@ -544,6 +579,11 @@ async def run(args) -> Path:
         save(out / "summary.json", {"status": status, "rows": all_rows, "stats": summarize(all_rows) if all_rows else None,
                                     "accounting": accounting})
         write_report(out, manifest, all_rows, accounting)
+        try:
+            from index_runs import write_index
+            write_index()  # Keep runs/INDEX.md current after every run.
+        except Exception as error:  # Indexing must never hide a run's own result.
+            print("Run index not updated:", type(error).__name__, error, flush=True)
 
     if args.mode == "check":
         for (group_id, _condition, _task_id, roles) in groups:
@@ -614,6 +654,8 @@ def main():
     p.add_argument("--max-tokens", type=int, default=20_000_000, help="Campaign-wide token allowance")
     p.add_argument("--parallel-groups", type=int, default=1, help="Groups (tasks) run at the same time")
     p.add_argument("--max-in-flight", type=int, default=8, help="Concurrent model requests across all agents")
+    p.add_argument("--label", default=None, help="Short name for the run folder and index (default: built from settings)")
+    p.add_argument("--note", default=None, help="Why this run was made; saved in the manifest and shown in runs/INDEX.md")
     p.add_argument("--image", default=DEFAULT_IMAGE)
     args = p.parse_args()
     if args.mode == "check":
