@@ -37,6 +37,36 @@ Agents within a group generate concurrently. `--parallel-groups G` runs G tasks 
 
 ## Run output
 
+### Optional threaded board
+
+Choose `--board-structure threaded` before a run to use top-level threads and nested
+replies. The default is `--board-structure flat`, preserving the existing tools and
+read cursor. Structure is independent of `--board-style basic|active`, prompt
+variant, and `--human-intervention`; keep those settings matched when comparing
+flat and threaded boards.
+
+In threaded mode, `board_post(text)` starts a thread; `board_reply(parent_id, text,
+relation)` responds to one existing post or reply, with relation `agree`,
+`disagree`, `question`, or `comment` (default). Agents must read a peer's message
+before replying to it. `board_list_threads()` returns metadata without reading
+bodies. `board_read(thread_id=ID)` returns one nested tree; without an ID it
+returns threads containing unread peer messages, including their ancestors.
+`board_read(unread_only=False)` returns all trees. Reads clear only messages
+actually returned, so there is no incremental cursor to skip an older unread post.
+
+Messages expose author, timestamp, parent ID, root thread ID, text, and reply
+relation. Read-history snapshots are stored only alongside `board_post` events
+in the audit log, not in message objects or agent-visible board content. A reply
+relation is the author's declared stance, not evidence of agreement or influence.
+Group isolation, board capacity and text limits apply to replies too. The manifest,
+run labels, and index record the structure; historical manifests default to flat.
+
+Zero-cost scripted integration check (Docker required):
+
+```sh
+.venv-impossible/bin/python experiments/lcb_swarm_campaign.py --mode check --board-structure threaded --board-style active
+```
+
 The committed results snapshot is in `experiments/results/INDEX.md` and
 `experiments/results/index.json`. It records all runs reviewed on October 5, 2026,
 including validity and the active-board/human-intervention confound. Raw logs

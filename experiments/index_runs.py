@@ -96,6 +96,7 @@ def describe(run: Path, notes: dict) -> dict:
         "condition": manifest.get("condition"),
         "board_style": manifest.get("board_style") or ("basic" if manifest.get("condition") == "board" else None),
         "abort_button": bool(manifest.get("human_intervention")),
+        "board_structure": manifest.get("board_structure") or "flat",
         "agents_per_task": manifest.get("agents_per_group"),
         "tasks": manifest.get("tasks"),
         "repeats_per_task": manifest.get("repeats_per_task"),
@@ -129,6 +130,8 @@ def viewer_name(entry: dict) -> str:
     setup = "single-agent" if entry["agents_per_task"] == 1 else entry["condition"] or "unknown"
     if entry["condition"] == "board":
         setup = f"{entry['board_style']}-board"
+        if entry.get("board_structure", "flat") != "flat":
+            setup += f"-{entry['board_structure']}"
     if entry["abort_button"]:
         setup += "-human-intervention"
     tasks = "-".join(t.replace("lcbhard_", "") for t in (entry["tasks"] or [])) or "unknown"
@@ -194,7 +197,7 @@ def write_index() -> tuple[Path, Path]:
     for e in live:
         setup = e["condition"] or "?"
         if e["condition"] == "board":
-            setup = f"board ({e['board_style']})"
+            setup = f"board ({e['board_style']}, {e['board_structure']})"
         elif e["agents_per_task"] == 1:
             setup = "single agent"
         if e["abort_button"]:
@@ -229,10 +232,10 @@ def write_index() -> tuple[Path, Path]:
         lines.append("")
     lines += ["## Scripted checks (oldest first)", "",
               "These use a deterministic fake model to test the harness. They are not evidence about model behaviour.", "",
-              "| Started (UTC) | Run | Prompt | Board style | Abort button | Status |", "|---|---|---|---|---|---|"]
+              "| Started (UTC) | Run | Prompt | Board style | Structure | Abort button | Status |", "|---|---|---|---|---|---|---|"]
     for e in checks:
         lines.append(f"| {(e['started_at'] or '?')[:16].replace('T', ' ')} | `{e['run_id']}` | {e['prompt']} | "
-                     f"{e['board_style'] or '—'} | {e['abort_button']} | {e['status']} |")
+                     f"{e['board_style'] or '—'} | {e['board_structure']} | {e['abort_button']} | {e['status']} |")
     lines += ["", "## Files in each run folder", "",
               "- `manifest.json`: every setting, prompt text, dataset hash, and start time.",
               "- `summary.json`: per-agent rows with outcome labels, statistics, and billing totals.",
