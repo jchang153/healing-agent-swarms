@@ -58,6 +58,8 @@ class BudgetGateway:
         max_tokens: int | None = None,
         deadline_monotonic: float | None = None,
         max_in_flight: int = 1,
+        prices: dict[str, tuple[float, float]] | None = None,
+        max_output_tokens: int = MAX_OUTPUT_TOKENS,
     ) -> None:
         if not isinstance(key, str) or not key:
             raise ValueError("An OpenRouter key must be supplied in memory")
@@ -72,6 +74,16 @@ class BudgetGateway:
             raise ValueError("deadline must be finite")
         if isinstance(max_in_flight, bool) or not isinstance(max_in_flight, int) or max_in_flight < 1:
             raise ValueError("max_in_flight must be a positive integer")
+        if prices is not None:
+            if not prices or any(not isinstance(m, str) or not m or len(v) != 2 or any(
+                    isinstance(x, bool) or not math.isfinite(float(x)) or float(x) <= 0 for x in v)
+                    for m, v in prices.items()):
+                raise ValueError("prices must map model IDs to positive (input, output) USD per million tokens")
+        if isinstance(max_output_tokens, bool) or not isinstance(max_output_tokens, int) or max_output_tokens < 1:
+            raise ValueError("max_output_tokens must be a positive integer")
+        # Allow-listed models and their prices; defaults to the experiment models above.
+        self._prices = {m: (float(v[0]), float(v[1])) for m, v in (prices or MODEL_PRICES).items()}
+        self._max_output_tokens = max_output_tokens
         self._agent_limits = dict(agent_limits or {})
         self._max_tokens = max_tokens
         self._deadline = deadline_monotonic
@@ -343,7 +355,7 @@ class BudgetGateway:
             self._error(handler, 502, "model catalog request failed")
 
     def _estimate(self, model: str, body_len: int, output_tokens: int) -> float:
-        input_price, output_price = MODEL_PRICES[model]
+        input_price, output_price = self._prices[model]
         # Byte count is deliberately used as a high-side token proxy. The extra
         # 10k covers chat framing/system overhead. Sonnet's input reserve also
         # includes the requested cache-write uplift.
@@ -371,25 +383,25 @@ class BudgetGateway:
             self._error(handler, 400, "invalid JSON request")
             return
         model = payload.get("model")
-        if not isinstance(model, str) or model not in MODEL_PRICES:
+        if not isinstance(model, str) or model not in self._prices:
             self._error(handler, 400, "model is not allow-listed")
             return
         if payload.get("stream") is True:
             self._error(handler, 400, "streaming is disabled by the budget gateway")
             return
         token_fields = [payload[k] for k in ("max_tokens", "max_completion_tokens") if k in payload]
-        output_tokens = MAX_OUTPUT_TOKENS
+        output_tokens = self._max_output_tokens
         for value in token_fields:
-            if isinstance(value, bool) or not isinstance(value, int) or value < 1 or value > MAX_OUTPUT_TOKENS:
-                self._error(handler, 400, "output token limit must be between 1 and 8192")
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1 or value > self._max_output_tokens:
+                self._error(handler, 400, f"output token limit must be between 1 and {self._max_output_tokens}")
                 return
-        # If neither cap is supplied, reserve the full allowed 8192 token output.
+        # If neither cap is supplied, reserve the full allowed output (8192 tokens by default).
         if token_fields:
             output_tokens = max(token_fields)
         else:
             # A budget reservation alone does not constrain provider output.
             # Materialize the cap in the forwarded request as well.
-            payload["max_tokens"] = MAX_OUTPUT_TOKENS
+            payload["max_tokens"] = self._max_output_tokens
             raw = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
             if len(raw) > MAX_REQUEST_BYTES:
                 self._error(handler, 413, "request body exceeds gateway limit")
