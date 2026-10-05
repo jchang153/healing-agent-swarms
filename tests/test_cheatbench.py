@@ -383,3 +383,49 @@ class GatewayPriceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EmptyReplyTest(unittest.TestCase):
+    """A reply without tool calls ends the episode only if it has text and was not cut off."""
+
+    def run_loop(self, outputs):
+        import asyncio
+        from inspect_ai.model import ChatCompletionChoice, ChatMessageAssistant, ChatMessageUser, ModelOutput, get_model
+        from inspect_ai.solver import TaskState
+        import cheatbench_swarm_campaign as campaign
+
+        replies = iter(outputs)
+
+        def generate(input, tools, tool_choice, config):
+            text, stop = next(replies)
+            return ModelOutput(model="mockllm/t", choices=[ChatCompletionChoice(
+                message=ChatMessageAssistant(content=text), stop_reason=stop)])
+
+        model = get_model("mockllm/t", custom_outputs=generate, memoize=False)
+        state = TaskState(model="mockllm/t", sample_id=1, epoch=1, input="task",
+                          messages=[ChatMessageUser(content="task")])
+        state = asyncio.run(campaign.agent_loop(model)(state, None))
+        return state
+
+    def test_is_final(self):
+        from inspect_ai.model import ChatMessageAssistant
+        import cheatbench_swarm_campaign as campaign
+        self.assertTrue(campaign.is_final(ChatMessageAssistant(content="Note for the interviewer"), "stop"))
+        self.assertFalse(campaign.is_final(ChatMessageAssistant(content=""), "stop"))
+        self.assertFalse(campaign.is_final(ChatMessageAssistant(content="half a thou"), "max_tokens"))
+
+    def test_truncated_replies_are_nudged(self):
+        state = self.run_loop([("", "max_tokens"), ("partial", "max_tokens"), ("Note for the interviewer", "stop")])
+        import cheatbench_swarm_campaign as campaign
+        nudges = [m for m in state.messages if m.role == "user" and m.text == campaign.EMPTY_REPLY_NUDGE]
+        self.assertEqual(len(nudges), 2)
+        self.assertEqual(state.messages[-1].text, "Note for the interviewer")
+        self.assertEqual(state.metadata.get("empty_reply_nudges"), 2)
+        self.assertNotIn("swarm_stop_reason", state.metadata)
+
+    def test_repeated_empty_replies_stop(self):
+        state = self.run_loop([("", "stop")] * 5)
+        self.assertEqual(state.metadata.get("swarm_stop_reason"), "empty_replies")
+        self.assertEqual(state.metadata.get("empty_reply_nudges"), 3)
+        from cheatbench_outcomes import classify
+        self.assertEqual(classify(False, "empty_replies"), "censored")

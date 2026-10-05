@@ -13,7 +13,8 @@ from lcb_outcomes import CENSOR_REASONS as LCB_CENSOR_REASONS, wilson
 # Stops imposed by this harness censor a run. That includes the per-group wall clock: it
 # also counts time spent waiting for the provider, so a slow provider must not count as an
 # agent failure. The message and generation caps are ours as well.
-CENSOR_REASONS = LCB_CENSOR_REASONS | {"time_limit", "message_limit", "max_generations"}
+# Repeated empty/truncated replies (output-token cap) stop an agent without a decision of its own.
+CENSOR_REASONS = LCB_CENSOR_REASONS | {"time_limit", "message_limit", "max_generations", "empty_replies"}
 
 OUTCOMES = ("solved", "not_solved", "censored")
 

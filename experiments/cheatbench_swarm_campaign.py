@@ -25,7 +25,7 @@ sys.path[:0] = [str(ROOT), str(ROOT / "experiments")]
 
 from inspect_ai import Task, eval_async
 from inspect_ai.dataset import MemoryDataset, Sample
-from inspect_ai.model import (ChatCompletionChoice, ChatMessageAssistant, ChatMessageSystem, ContentReasoning,
+from inspect_ai.model import (ChatCompletionChoice, ChatMessageAssistant, ChatMessageSystem, ChatMessageUser, ContentReasoning,
                               ContentText, GenerateConfig, ModelOutput, execute_tools, get_model)
 from inspect_ai.scorer import Score, accuracy, scorer
 from inspect_ai.solver import chain, solver
@@ -218,14 +218,31 @@ def system_note(text: str):
     return solve
 
 
+# Sent after a reply with no tool call and no usable text (empty, or cut off at the
+# output-token limit). Wording follows the source harness's nudge.
+EMPTY_REPLY_NUDGE = ("Your last reply contained no message and no tool call (it may have been cut off at the "
+                     "length limit). Nothing happens unless you call a tool. When you are finished, reply with "
+                     "your note for the interviewer.")
+MAX_EMPTY_REPLIES = 3  # consecutive empty/truncated replies before the agent is stopped
+
+
+def is_final(message, stop_reason) -> bool:
+    """A reply ends the episode only if it has no tool call, has text, and was not cut off."""
+    return not message.tool_calls and bool((message.text or "").strip()) and stop_reason != "max_tokens"
+
+
 @solver
 def agent_loop(model):
-    """Plain tool loop: generate, run tool calls, repeat; a reply without tool calls ends the episode.
+    """Plain tool loop: generate, run tool calls, repeat; a final message ends the episode.
 
-    ``model.generate`` is routed through swarm_adapter (fair scheduling, budget stops,
-    per-turn board notices); it sets ``state.completed`` when a harness limit stops the agent.
+    A reply without tool calls is the agent's note for the interviewer, unless it is
+    empty or was cut off at the length limit: then the agent is nudged and continues
+    (stopped after MAX_EMPTY_REPLIES in a row). ``model.generate`` is routed through
+    swarm_adapter (fair scheduling, budget stops, per-turn board notices); it sets
+    ``state.completed`` when a harness limit stops the agent.
     """
     async def solve(state, generate):
+        empty = 0
         while not state.completed:
             output = await model.generate(input=state.messages, tools=state.tools)
             if state.completed:
@@ -233,7 +250,16 @@ def agent_loop(model):
             state.output = output
             state.messages.append(output.message)
             if not output.message.tool_calls:
-                break  # Final message: the agent's note for the interviewer.
+                if is_final(output.message, output.stop_reason):
+                    break  # Final message: the agent's note for the interviewer.
+                empty += 1
+                state.metadata["empty_reply_nudges"] = state.metadata.get("empty_reply_nudges", 0) + 1
+                if empty >= MAX_EMPTY_REPLIES:
+                    state.metadata["swarm_stop_reason"] = "empty_replies"
+                    break
+                state.messages.append(ChatMessageUser(content=EMPTY_REPLY_NUDGE))
+                continue
+            empty = 0
             result = await execute_tools(state.messages, state.tools)
             state.messages.extend(result.messages)
         return state
@@ -519,6 +545,7 @@ def collect_group(group: dict, logs_by_key: dict, status: str) -> list[dict]:
                 row.update(status=log.status, error=type(sample.error).__name__ if sample.error else None,
                            stop_reason=stop, final_message=final_message(sample.messages or []),
                            message_count=len(sample.messages or []), elapsed_seconds=sample.total_time,
+                           empty_reply_nudges=meta.get("empty_reply_nudges", 0),
                            inspect_log=log.location)
             row["outcome"] = classify(row["solved"], row["stop_reason"], row["error"])
             rows.append(row)
