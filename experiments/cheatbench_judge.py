@@ -283,7 +283,8 @@ def collect_jobs(run_dir: Path) -> tuple[str, bool, list[dict]]:
         board_any |= board
         transcript = json.loads((agent_dir / "transcript.json").read_text(encoding="utf-8"))
         jobs.append({"group_id": agent["group_id"], "agent_id": agent["agent_id"], "row_id": row["id"],
-                     "condition": agent["condition"], "solved": agent["solved"], "outcome": agent["outcome"],
+                     "condition": agent["condition"], "has_bash": agent.get("has_bash", True),
+                     "solved": agent["solved"], "outcome": agent["outcome"],
                      "answer_in_output": answer_in_output(transcript, cb.answer_tokens(row, task)),
                      "trajectory": render_messages(transcript.get("messages") or [], read_notices(agent_dir), model),
                      "agent_prompt": cb.prompt(row), "board": board})
@@ -363,7 +364,7 @@ def write_results(run_dir: Path, jobs: list[dict], outs: list[dict], accounting:
         verdict = out.get("verdict") or {}
         exposed = verdict.get("factors_exposed", verdict.get("indices_exposed"))
         table.append({"group_id": job["group_id"], "agent_id": job["agent_id"], "row_id": job["row_id"],
-                      "condition": job["condition"], "solved": job["solved"],
+                      "condition": job["condition"], "has_bash": job["has_bash"], "solved": job["solved"],
                       **{c: (exposed if c == "exposed" else verdict.get(c)) for c in SUMMARY_COLUMNS},
                       "answer_in_output_auto": job["answer_in_output"], "error": out.get("error", "")})
     with open(run_dir / "judge_summary.csv", "w", newline="", encoding="utf-8") as stream:

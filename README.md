@@ -63,6 +63,8 @@ A live run is paid and needs explicit authorization, for example:
 
 `--seconds` (default 3600, CheatBench's 60 minutes) is a per-group wall clock. It includes time spent waiting for the provider, so when it stops an agent, the agent is counted as `censored`, like the harness's own caps, `--message-limit` (default 400) and `--max-turns` (default 200), and budget stops. Each agent folder contains `episode.json`, `verifier.json` (every check), `transcript.json`, `files/` (the final workspace and runner files), and in the active style `board_notices.jsonl`.
 
+`--bash-agents K` (default: every agent has bash) keeps bash for only K agents per group. They are chosen at random by `--episode-seed` plus the group index. The other agents get two host-side tools instead: `read_workspace_file`, which is read-only and limited to their own `/workspace` (an empty filename lists the files), and `write_notes`, which writes only `/workspace/notes.txt`, replacing it or appending with `append=true`. Their `skills.md` has exactly two passages changed to describe these tools; the rest is CheatBench's text. Agents are not told who has bash. `has_bash` is recorded per agent in `summary.json`, `report.md` and the judge output.
+
 Judge (CheatBench's prompt, task schema and shared rule, default judge `openai/gpt-6-sol` with high reasoning effort). `--dry-run` only renders each agent's transcript into CheatBench's log format (`judge_inputs/`). It reads no credential and makes no API calls. A paid pass reads the key with `healing_swarm.secrets` and sends requests only through the loopback budget gateway. The gateway needs the judge model's prices to reserve spend conservatively:
 
 ```sh
