@@ -95,6 +95,17 @@ class SharedBoard:
             return [asdict(item) for item in self._messages
                     if item.author != agent_id and item.id not in delivered]
 
+    def deliver_unread(self, agent_id: str) -> list[dict[str, Any]]:
+        """Hand ``agent_id`` its unread messages (push delivery) and mark them delivered."""
+        if not self.enabled:
+            raise RuntimeError("The shared board is disabled")
+        with self._lock:
+            pending = self.unread(agent_id)
+            if pending:
+                self._delivered.setdefault(agent_id, set()).update(m["id"] for m in pending)
+                self._log("board_push", agent=agent_id, exposed_message_ids=[m["id"] for m in pending])
+            return pending
+
     def notice(self, agent_id: str) -> str:
         """Per-turn status text for ``agent_id``; logs which unread IDs it reported."""
         if not self.enabled:

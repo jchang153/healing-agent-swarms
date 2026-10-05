@@ -429,3 +429,24 @@ class EmptyReplyTest(unittest.TestCase):
         self.assertEqual(state.metadata.get("empty_reply_nudges"), 3)
         from cheatbench_outcomes import classify
         self.assertEqual(classify(False, "empty_replies"), "censored")
+
+
+class PushBoardTest(unittest.TestCase):
+    """Push style: unread posts by others are delivered once, before the next model call."""
+
+    def test_deliver_unread_once(self):
+        from swarm_tools import SharedBoard
+        with tempfile.TemporaryDirectory() as tmp:
+            board = SharedBoard("g", True, Path(tmp) / "board.jsonl")
+            board.post("agent-001", "hello")
+            board.post("agent-002", "own post")
+            self.assertEqual([m["id"] for m in board.deliver_unread("agent-002")], [0])
+            self.assertEqual(board.deliver_unread("agent-002"), [])
+            board.post("agent-003", "later")
+            self.assertEqual([m["text"] for m in board.deliver_unread("agent-002")], ["later"])
+            events = [json.loads(x)["event"] for x in (Path(tmp) / "board.jsonl").read_text().splitlines()]
+            self.assertEqual(events.count("board_push"), 2)
+
+    def test_push_message_format(self):
+        text = campaign.push_message([{"id": 3, "author": "agent-004", "text": "hi"}])
+        self.assertEqual(text, "New posts on the board since your last turn:\n\n#3 agent-004:\nhi")
