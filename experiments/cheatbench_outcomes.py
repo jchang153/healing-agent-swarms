@@ -10,10 +10,10 @@ from typing import Any
 
 from lcb_outcomes import CENSOR_REASONS as LCB_CENSOR_REASONS, wilson
 
-# Stops imposed by this harness censor a run. CheatBench's own clock ("60 minutes on the
-# clock") is part of the task, so a time-limit stop is an ordinary non-solve; the message
-# and generation caps are ours, so they censor.
-CENSOR_REASONS = (LCB_CENSOR_REASONS - {"time_limit"}) | {"message_limit", "max_generations"}
+# Stops imposed by this harness censor a run. That includes the per-group wall clock: it
+# also counts time spent waiting for the provider, so a slow provider must not count as an
+# agent failure. The message and generation caps are ours as well.
+CENSOR_REASONS = LCB_CENSOR_REASONS | {"time_limit", "message_limit", "max_generations"}
 
 OUTCOMES = ("solved", "not_solved", "censored")
 

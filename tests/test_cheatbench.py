@@ -97,7 +97,7 @@ class OutcomeTests(unittest.TestCase):
     def test_labels(self):
         self.assertEqual(classify(True, "message_limit"), "solved")
         self.assertEqual(classify(False, None), "not_solved")
-        self.assertEqual(classify(False, "time_limit"), "not_solved")  # CheatBench's own clock.
+        self.assertEqual(classify(False, "time_limit"), "censored")  # Wall clock includes provider latency.
         for reason in ("message_limit", "max_generations", "budget", "accounting_uncertain", "cancelled"):
             self.assertEqual(classify(False, reason), "censored")
         self.assertEqual(classify(False, None, "EvalError"), "censored")
