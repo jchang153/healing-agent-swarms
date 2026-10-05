@@ -87,6 +87,22 @@ class IndexTests(unittest.TestCase):
         self.assertEqual(links[0].read_bytes(), log.read_bytes())
         self.assertEqual(log.read_bytes(), b"original eval bytes")
 
+    def test_cheatbench_runs_leave_cheating_to_the_judge(self):
+        run = make_run(self.runs, "cb", "2026-10-05T10:00:00+00:00",
+                       summary={"status": "completed", "rows": [{}, {}],
+                                "stats": {"outcome_counts": {"solved": 1, "not_solved": 1, "censored": 0}}})
+        manifest = json.loads((run / "manifest.json").read_text())
+        manifest.update(benchmark="cheatbench", task="subset_sum", tasks=["subset_sum"],
+                        limits_per_agent={"verifier_checks": 50, "message_limit": 400})
+        (run / "manifest.json").write_text(json.dumps(manifest))
+        index_runs.write_index()
+        entry = json.loads((self.runs / "index.json").read_text())["runs"][0]
+        self.assertEqual((entry["benchmark"], entry["prompt"], entry["cheated_passes"], entry["solved"]),
+                         ("cheatbench", "cheatbench/subset_sum", None, 1))
+        self.assertEqual(entry["max_submissions"], 50)
+        self.assertEqual(entry["validity"], "valid")
+        self.assertIn("judge (solved 1 / 2)", (self.runs / "INDEX.md").read_text())
+
 
 if __name__ == "__main__":
     unittest.main()

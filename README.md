@@ -35,6 +35,43 @@ A live run needs `--mode live`, `--condition board|independent`, and `--max-usd`
 
 Agents within a group generate concurrently. `--parallel-groups G` runs G tasks at once in one Inspect call so all their agents start together, and `--max-in-flight K` (default 8) caps concurrent model requests across all agents. The gateway reserves budget atomically before each request and settles it after, so concurrency does not let reservations exceed the allowance. Each agent container is capped at 1 CPU and 1 GiB; size `G × agents` to the Docker host.
 
+## CheatBench tasks
+
+`experiments/cheatbench_swarm_campaign.py` runs two CheatBench tasks (Center for AI Safety, MIT; pinned files in `vendor/cheatbench/`, see its README): `--task prime_factorization` (20 episodes, tool `verify_factors`) and `--task subset_sum` (10 episodes, tool `verify_subset`). Each agent is one Inspect task whose input is CheatBench's prompt verbatim. Agents in a group get distinct episodes, drawn per group with `--episode-seed`. Each agent runs in its own container built from CheatBench's Dockerfile, with only its episode's files mounted at `/workspace` and `/home/runner/work`, no network, 1 CPU, 1 GiB, and 256 PIDs. Tools are Inspect's `bash` (starting in `/workspace`, 60 s per command), CheatBench's verifier run on the host (its own description, schema and 50-check limit, one verifier state per agent), and `board_read`/`board_post` in the `board` condition. There is no submit tool. An agent finishes by replying without a tool call, and that reply is its note for the interviewer. `solved` means the verifier accepted an answer. Cheating is labelled afterwards by CheatBench's judge.
+
+One-time setup (no credentials involved):
+
+```sh
+docker build -t cheatbench-env - < vendor/cheatbench/Dockerfile   # no build context is sent
+vendor/cheatbench/fetch.sh prime_factorization                    # data goes to the Git-ignored data/cheatbench/
+vendor/cheatbench/fetch.sh subset_sum
+```
+
+Scripted check (no API calls, zero cost). It runs a 3-agent board group and a 2-agent independent group, where scripted agents read the planted answer log and submit it:
+
+```sh
+.venv-impossible/bin/python experiments/cheatbench_swarm_campaign.py --mode check --task prime_factorization
+.venv-impossible/bin/python experiments/cheatbench_swarm_campaign.py --mode check --task subset_sum --board-style active
+```
+
+A live run is paid and needs explicit authorization, for example:
+
+```sh
+.venv-impossible/bin/python experiments/cheatbench_swarm_campaign.py --mode live --task prime_factorization \
+  --condition board --agents 5 --groups 4 --parallel-groups 2 --max-usd 20 --note "why this run"
+```
+
+`--seconds` (default 3600, CheatBench's 60 minutes) is a per-group wall clock. When it stops an agent, the agent is counted as `not_solved`. The harness's own caps, `--message-limit` (default 400) and `--max-turns` (default 200), and budget stops are counted as `censored`. Each agent folder contains `episode.json`, `verifier.json` (every check), `transcript.json`, `files/` (the final workspace and runner files), and in the active style `board_notices.jsonl`.
+
+Judge (CheatBench's prompt, task schema and shared rule, default judge `openai/gpt-6-sol` with high reasoning effort). `--dry-run` only renders each agent's transcript into CheatBench's log format (`judge_inputs/`). It reads no credential and makes no API calls. A paid pass reads the key with `healing_swarm.secrets` and sends requests only through the loopback budget gateway. The gateway needs the judge model's prices to reserve spend conservatively:
+
+```sh
+.venv-impossible/bin/python experiments/cheatbench_judge.py runs/<run> --dry-run
+.venv-impossible/bin/python experiments/cheatbench_judge.py runs/<run> --max-usd 5 --price-in <USD/M input> --price-out <USD/M output>
+```
+
+It writes `judge.jsonl`, `judge_summary.csv` and `judge_accounting.json`. `admitted_method` and, for board runs, `used_peer_answer` are our additions and never change `cheated`. `answer_in_output_auto` is a deterministic check of whether the agent's own planted answer appeared in one of its tool results.
+
 ## Run output
 
 The committed results snapshot is in `experiments/results/INDEX.md` and

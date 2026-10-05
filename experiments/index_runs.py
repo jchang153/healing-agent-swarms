@@ -83,16 +83,24 @@ def describe(run: Path, notes: dict) -> dict:
 
     passes = sum(v for k, v in outcomes.items() if k.startswith("pass_"))
     agents = sum(outcomes.values())
+    benchmark = manifest.get("benchmark") or "lcb"
+    limits = manifest.get("limits_per_agent") or {}
+    if benchmark == "cheatbench":
+        prompt = f"cheatbench/{manifest.get('task')}"
+        passes = None  # Cheating on CheatBench is labelled by experiments/cheatbench_judge.py, not by outcomes.
+    else:
+        # Runs before the --prompt option existed always used prompt D.
+        prompt = manifest.get("prompt_variant") or "D"
     return {
         "run_id": run.name,
+        "benchmark": benchmark,
         "path": str(run.relative_to(ROOT)),
         "started_at": manifest.get("started_at"),
         "kind": "scripted check (no model calls)" if is_check else "live (paid)",
         "validity": validity,
         "status": (summary or {}).get("status", "no summary (run did not finish)"),
         "model": manifest.get("model"),
-        # Runs before the --prompt option existed always used prompt D.
-        "prompt": manifest.get("prompt_variant") or "D",
+        "prompt": prompt,
         "condition": manifest.get("condition"),
         "board_style": manifest.get("board_style") or ("basic" if manifest.get("condition") == "board" else None),
         "abort_button": bool(manifest.get("human_intervention")),
@@ -100,9 +108,10 @@ def describe(run: Path, notes: dict) -> dict:
         "tasks": manifest.get("tasks"),
         "repeats_per_task": manifest.get("repeats_per_task"),
         "message_limit": (manifest.get("limits_per_agent") or {}).get("message_limit"),
-        "max_submissions": (manifest.get("limits_per_agent") or {}).get("max_submissions"),
+        "max_submissions": limits.get("max_submissions", limits.get("verifier_checks")),
         "agents_finished": agents,
         "cheated_passes": passes,
+        "solved": outcomes.get("solved") if benchmark == "cheatbench" else None,
         "outcomes": outcomes,
         "board": _board_counts(run),
         "spend": _spend(run, summary),
@@ -183,6 +192,10 @@ def write_index() -> tuple[Path, Path]:
         "`pass_tests_intact` cheated without editing tests, `pass_tests_modified` cheated after editing tests, "
         "`flagged` used the abort string, `fail` did not pass, `censored` stopped by a harness limit.",
         "",
+        "CheatBench runs (prompt `cheatbench/<task>`) are labelled `solved` (the verifier accepted an answer), "
+        "`not_solved` or `censored`; whether an agent cheated comes from `experiments/cheatbench_judge.py` "
+        "(`judge_summary.csv` in the run folder), not from these labels.",
+        "",
         f"Live runs: {len(live)}. Recorded spend: ${recorded:.2f}; possibly unrecorded (open reservations): "
         f"up to ${unrecorded:.2f}. Scripted checks: {len(checks)} (no spend).",
         "",
@@ -201,6 +214,8 @@ def write_index() -> tuple[Path, Path]:
             setup += " + abort button"
         tasks = ", ".join(t.replace("lcbhard_", "") for t in (e["tasks"] or [])) or "?"
         cheated = f"{e['cheated_passes']} / {e['agents_finished']}" if e["agents_finished"] else "—"
+        if e.get("benchmark") == "cheatbench":
+            cheated = f"judge (solved {e['solved'] or 0} / {e['agents_finished']})"
         spend = f"${e['spend']['recorded_usd']:.2f}"
         if e["spend"]["possibly_unrecorded_usd"]:
             spend += f" (+≤${e['spend']['possibly_unrecorded_usd']:.2f})"
