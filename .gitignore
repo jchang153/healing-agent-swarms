@@ -10,3 +10,6 @@ __pycache__/
 .venv-impossible/
 .venv-impossible-conda/
 .DS_Store
+
+# CheatBench task data, rebuilt by vendor/cheatbench/fetch.sh
+data/cheatbench/
