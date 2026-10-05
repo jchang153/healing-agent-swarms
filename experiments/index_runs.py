@@ -10,8 +10,11 @@ Usage: python3 experiments/index_runs.py
 from __future__ import annotations
 
 import json
+import re
+import shutil
 import sys
 from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -118,11 +121,47 @@ def _fmt_outcomes(entry: dict) -> str:
     return ", ".join(f"{k} {v}" for k, v in entry["outcomes"].items())
 
 
+def viewer_name(entry: dict) -> str:
+    """Human-readable experiment identity, with UTC start time."""
+    started = entry.get("started_at")
+    stamp = (datetime.fromisoformat(started.replace("Z", "+00:00"))
+             .astimezone(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")) if started else "undated"
+    setup = "single-agent" if entry["agents_per_task"] == 1 else entry["condition"] or "unknown"
+    if entry["condition"] == "board":
+        setup = f"{entry['board_style']}-board"
+    if entry["abort_button"]:
+        setup += "-human-intervention"
+    tasks = "-".join(t.replace("lcbhard_", "") for t in (entry["tasks"] or [])) or "unknown"
+    label = f"prompt-{entry['prompt']}_{setup}_{entry['agents_per_task']}-agents_tasks-{tasks}_{entry['validity']}"
+    suffix = entry["run_id"].split("_")[-1].removeprefix("lcb-")[-6:]
+    return f"{stamp}_{re.sub(r'[^A-Za-z0-9_-]+', '-', label)}_{suffix}"
+
+
+def write_viewer_layout(entries: list[dict]) -> None:
+    """Copy evals into descriptive folders; preserve historical files and paths."""
+    view = ROOT / "inspect-view"
+    for entry in entries:
+        category = "live-experiments" if entry["kind"].startswith("live") else "scripted-checks"
+        dest = view / category / viewer_name(entry)
+        dest.mkdir(parents=True, exist_ok=True)
+        source = ROOT / entry["path"]
+        entry["viewer_path"] = str(dest.relative_to(ROOT))
+        for log in source.rglob("*.eval"):
+            target = dest / log.relative_to(source)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if target.is_symlink():
+                target.unlink()  # Replace generated links; Inspect excludes symlink logs.
+            if target.exists() and target.read_bytes() == log.read_bytes():
+                continue
+            shutil.copy2(log, target)
+
+
 def write_index() -> tuple[Path, Path]:
     notes = (_load(ANNOTATIONS) or {}).get("runs", {})
     entries = sorted((describe(r, notes) for r in _run_dirs()), key=lambda e: e["started_at"] or "")
     for number, entry in enumerate(e for e in entries if e["kind"].startswith("live")):
         entry["live_run_number"] = number + 1
+    write_viewer_layout(entries)
     (RUNS / "index.json").write_text(json.dumps({"runs": entries}, indent=2) + "\n", encoding="utf-8")
 
     live = [e for e in entries if e["kind"].startswith("live")]

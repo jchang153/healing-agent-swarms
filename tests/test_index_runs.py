@@ -71,6 +71,22 @@ class IndexTests(unittest.TestCase):
         self.assertEqual(runs["overridden"]["prompt"], "D")  # Runs before --prompt existed used D.
         self.assertIn("timeout", (self.runs / "INDEX.md").read_text())
 
+    def test_viewer_copies_preserve_logs_and_are_idempotent(self):
+        run = make_run(self.runs, "lcb-123456abcdef", "2026-10-03T20:24:05+00:00",
+                       summary={"status": "completed", "rows": [{}]})
+        log = run / "wave-0000" / "inspect" / "agent.eval"
+        log.parent.mkdir(parents=True)
+        log.write_bytes(b"original eval bytes")
+        index_runs.write_index()
+        index_runs.write_index()
+        entry = json.loads((self.runs / "index.json").read_text())["runs"][0]
+        self.assertIn("2026-10-03T202405Z_prompt-D_basic-board_2-agents_tasks-0_valid", entry["viewer_path"])
+        links = list((self.root / "inspect-view").rglob("*.eval"))
+        self.assertEqual(len(links), 1)
+        self.assertFalse(links[0].is_symlink())
+        self.assertEqual(links[0].read_bytes(), log.read_bytes())
+        self.assertEqual(log.read_bytes(), b"original eval bytes")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -37,6 +37,19 @@ Agents within a group generate concurrently. `--parallel-groups G` runs G tasks 
 
 ## Run output
 
+The committed results snapshot is in `experiments/results/INDEX.md` and
+`experiments/results/index.json`. It records all runs reviewed on October 5, 2026,
+including validity and the active-board/human-intervention confound. Raw logs
+and transcripts remain in the local, Git-ignored `runs/` archive.
+
+For descriptive names in Inspect, run `python3 experiments/index_runs.py`, then
+`.venv-impossible/bin/inspect view --log-dir inspect-view --recursive --host 127.0.0.1 --port 7575`.
+The Folders view separates `live-experiments` and `scripted-checks`. Experiment
+folders include the UTC start date/time, prompt, setup, agent count, task IDs,
+validity, and a short unique ID. `inspect-view/` contains generated copies
+of the original `.eval` files; historical run folders and log contents retain their
+original paths. The layout refreshes whenever the run index is regenerated.
+
 **Start with `runs/INDEX.md`.** It lists every run oldest first by its recorded start time, with prompt, setup, outcomes, spend, a validity flag (`valid`, `censored`, `aborted`, `test`), and notes on purpose and known problems. `runs/index.json` holds the same data for scripts. Both are regenerated after every run, or manually with `python3 experiments/index_runs.py`. Hand-written notes for each run live in `experiments/run_annotations.json`, which is tracked in Git; `runs/` itself is ignored by Git, so back it up separately.
 
 New runs are written to `runs/<UTC start>_<label>_<id>/`, so an alphabetical listing is chronological; scripted checks go to `runs/checks/`. Pass `--label` for the folder name and `--note "why this run"` to record its purpose. Each manifest records the Git commit and whether the code had uncommitted changes. Runs from before this layout keep their `runs/lcb-<id>/` names; the index orders them correctly.
