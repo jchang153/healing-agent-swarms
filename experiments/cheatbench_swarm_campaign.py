@@ -33,7 +33,7 @@ from inspect_ai.tool import ToolCall, ToolDef, ToolError, ToolParam, ToolParams,
 
 import cheatbench_tasks as cb
 from cheatbench_outcomes import classify, summarize
-from impossible_budget import BudgetGateway, CONTINGENCY_USD, MAX_OUTPUT_TOKENS, MODEL_PRICES
+from impossible_budget import BudgetGateway, CONTINGENCY_USD, MODEL_PRICES
 from swarm_tools import FairScheduler, SharedBoard, swarm_adapter
 from healing_swarm.secrets import read_credentials
 from lcb_swarm_campaign import generation_config, git_state, save, sha256_file
@@ -596,8 +596,10 @@ def validate(args) -> None:
         raise ValueError("--bash-agents must be between 0 and --agents")
     if not (args.seconds > 0 and math.isfinite(args.seconds)):
         raise ValueError("--seconds must be positive and finite")
-    if args.max_output_tokens > MAX_OUTPUT_TOKENS:
-        raise ValueError(f"--max-output-tokens cannot exceed the gateway cap of {MAX_OUTPUT_TOKENS}")
+    # The gateway is built with this cap (below); 65536 is only a sanity bound. Long hand
+    # arithmetic in the reasoning exceeds the LCB default of 8192 and truncates replies.
+    if args.max_output_tokens > 65536:
+        raise ValueError("--max-output-tokens cannot exceed 65536")
     if args.mode == "live":
         if args.model not in MODEL_PRICES:
             raise ValueError("Model is not supported by the spending guard")
@@ -655,7 +657,7 @@ async def run(args) -> Path:
             raise ValueError("OpenRouter credential unavailable")
         per_agent = args.max_usd_per_agent or args.max_usd
         gateway = BudgetGateway(key, out / "billing", args.max_usd, max_tokens=args.max_tokens,
-                                max_in_flight=args.max_in_flight,
+                                max_in_flight=args.max_in_flight, max_output_tokens=args.max_output_tokens,
                                 agent_limits={f"{g}/agent-{i + 1:03d}": per_agent for g, _, rows, _ in groups for i in range(len(rows))})
         base_url = gateway.start()
     os.environ["OPENROUTER_API_KEY"] = "local-budget-proxy"  # The real key stays inside the gateway.
