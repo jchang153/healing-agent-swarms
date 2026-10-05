@@ -26,6 +26,7 @@ import csv
 import importlib.util
 import json
 import math
+import time
 import re
 import sys
 from pathlib import Path
@@ -301,6 +302,8 @@ def main(argv=None):
     ap.add_argument("--price-out", type=float, default=None, help="Judge model output price, USD per million tokens")
     ap.add_argument("--max-output-tokens", type=int, default=32768, help="Per-verdict output cap (includes reasoning)")
     ap.add_argument("--workers", type=int, default=6)
+    ap.add_argument("--only-missing", action="store_true",
+                    help="Judge only agents without a verdict in judge.jsonl and merge; billing goes to a new judge-billing-* folder")
     args = ap.parse_args(argv)
 
     run_dir = args.run_dir.resolve()
@@ -315,6 +318,19 @@ def main(argv=None):
     print(f"{len(jobs)} {task} transcripts rendered to {inputs}")
     if args.dry_run:
         return 0
+    previous = {}
+    if args.only_missing and (run_dir / "judge.jsonl").exists():
+        for line in (run_dir / "judge.jsonl").read_text(encoding="utf-8").splitlines():
+            row = json.loads(line)
+            if row.get("verdict"):
+                previous[(row["group_id"], row["agent_id"])] = {k: row[k] for k in row if k not in
+                                                                ("group_id", "agent_id", "row_id", "condition", "has_bash",
+                                                                 "solved", "answer_in_output", "board")}
+    all_jobs = jobs
+    jobs = [j for j in all_jobs if (j["group_id"], j["agent_id"]) not in previous]
+    if not jobs:
+        print("nothing to judge: every agent already has a verdict")
+        return 0
 
     for name in ("max_usd", "price_in", "price_out"):
         value = getattr(args, name)
@@ -328,7 +344,10 @@ def main(argv=None):
     key = read_credentials(ROOT / ".env").get("OPENROUTER_API_KEY")
     if not key:
         raise SystemExit("OpenRouter credential unavailable")
-    gateway = BudgetGateway(key, run_dir / "judge-billing", args.max_usd, max_in_flight=args.workers,
+    billing = run_dir / "judge-billing"
+    if args.only_missing and billing.exists():  # keep earlier passes' ledgers; a stopped ledger stays stopped
+        billing = run_dir / f"judge-billing-{time.strftime('%Y%m%dT%H%M%S')}"
+    gateway = BudgetGateway(key, billing, args.max_usd, max_in_flight=args.workers,
                             prices={args.model: (args.price_in, args.price_out)},
                             max_output_tokens=args.max_output_tokens)
     del key
@@ -345,6 +364,10 @@ def main(argv=None):
     finally:
         gateway.stop()
         accounting = gateway.snapshot()
+    if previous:  # merge with earlier verdicts, in the original agent order
+        new = {(j["group_id"], j["agent_id"]): o for j, o in zip(jobs, outs)}
+        jobs, outs = all_jobs, [previous.get((j["group_id"], j["agent_id"])) or new[(j["group_id"], j["agent_id"])]
+                                for j in all_jobs]
     write_results(run_dir, jobs, outs, accounting)
     return 0
 
