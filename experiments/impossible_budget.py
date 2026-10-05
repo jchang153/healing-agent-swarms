@@ -36,6 +36,10 @@ MODEL_PRICES: dict[str, tuple[float, float]] = {
     "openai/gpt-5": (1.25, 10.0),
     "openai/o3": (2.0, 8.0),
     "anthropic/claude-sonnet-4": (3.0, 15.0),
+    # CheatBench runs. Flash at Together's price; Pro at the highest listed provider price
+    # (DeepInfra input, Parasail output), so reservations stay conservative.
+    "deepseek/deepseek-v4.1-flash": (0.30, 1.20),
+    "deepseek/deepseek-v4-pro": (1.30, 3.48),
 }
 
 

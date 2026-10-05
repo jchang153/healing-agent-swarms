@@ -60,6 +60,14 @@ def run_directory(args) -> Path:
     return base / f"{stamp}_{slug}_{uuid.uuid4().hex[:6]}"
 
 
+def provider_routing(args) -> dict:
+    """OpenRouter routing: no fallbacks, all parameters required; optionally one pinned provider."""
+    routing = {"allow_fallbacks": False, "require_parameters": True}
+    if args.provider:
+        routing["order"] = [args.provider]
+    return routing
+
+
 def agent_note(agent_id: str, board_enabled: bool, agents: int, style: str = "basic") -> str | None:
     """One-time system message for multi-agent runs (LCB campaign wording, adapted to separate instances)."""
     if agents == 1:
@@ -429,8 +437,7 @@ def build_group(args, out: Path, group_id: str, rows: list[dict], *, scripted: b
             else:
                 model = get_model("openrouter/" + args.model, config=generation_config(args, f"{group_id}/{agent_id}"),
                                   base_url=base_url, api_key="local-budget-proxy",
-                                  provider={"allow_fallbacks": False, "require_parameters": True},
-                                  stream=False, memoize=False)
+                                  provider=provider_routing(args), stream=False, memoize=False)
             shell = ([bash(timeout=args.bash_timeout)] if has_bash
                      else no_shell_tools(files / "workspace", agent_id, scheduler))
             tools = shell + [verify_tool(args.task, call, agent_id, scheduler)]
@@ -666,7 +673,7 @@ async def run(args) -> Path:
         "generation": {"max_output_tokens": args.max_output_tokens, "temperature": args.temperature, "seed": args.seed,
                        "reasoning_effort": args.reasoning_effort if args.model.startswith("openai/") else None,
                        "reasoning_tokens": args.reasoning_tokens if args.model.startswith("anthropic/") else None,
-                       "provider": {"allow_fallbacks": False, "require_parameters": True}, "max_retries": 0},
+                       "provider": provider_routing(args), "max_retries": 0},
         "limits_per_agent": {"verifier_checks": verifier.MAX_ATTEMPTS, "message_limit": args.message_limit,
                              "max_generations": args.max_turns, "bash_timeout_seconds": args.bash_timeout,
                              "max_usd": args.max_usd_per_agent or args.max_usd},
@@ -810,6 +817,7 @@ def main():
     p.add_argument("--episodes", nargs="*", help="Restrict the draw to these episode IDs (default: all rows)")
     p.add_argument("--episode-seed", type=int, default=0, help="Seed for drawing episodes per group")
     p.add_argument("--model", default="openai/gpt-5")
+    p.add_argument("--provider", default=None, help="Pin one OpenRouter provider (e.g. Together); no fallback to others")
     p.add_argument("--reasoning-effort", default="medium")
     p.add_argument("--reasoning-tokens", type=int, default=4096)
     p.add_argument("--max-output-tokens", type=int, default=8192)
