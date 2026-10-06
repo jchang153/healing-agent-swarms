@@ -14,7 +14,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import RLock
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, Literal
 
 from inspect_ai.solver import TaskState, Solver, solver
 from inspect_ai.tool import tool
@@ -26,13 +26,17 @@ class _Message:
     author: str
     text: str
     timestamp: str
+    parent_id: int | None = None
+    thread_id: int | None = None
+    relation: str = "comment"
 
 
 class SharedBoard:
     """A bounded board whose authors are supplied by the trusted caller."""
 
     def __init__(self, group_id: str, enabled: bool, log_path: str | Path,
-                 *, max_messages: int = 1000, max_text_length: int = 2000) -> None:
+                 *, max_messages: int = 1000, max_text_length: int = 2000,
+                 structure: str = "flat") -> None:
         if not isinstance(group_id, str) or not group_id:
             raise ValueError("group_id must be a non-empty string")
         if not isinstance(enabled, bool):
@@ -42,6 +46,9 @@ class SharedBoard:
         if isinstance(max_text_length, bool) or not isinstance(max_text_length, int) or max_text_length < 1:
             raise ValueError("max_text_length must be a positive integer")
         self.group_id = group_id
+        if structure not in ("flat", "threaded"):
+            raise ValueError("structure must be flat or threaded")
+        self.structure = structure
         self.enabled = enabled
         self.log_path = Path(log_path)
         self.max_messages = max_messages
@@ -57,7 +64,14 @@ class SharedBoard:
         with self.log_path.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(row, ensure_ascii=False) + "\n")
 
-    def post(self, agent_id: str, text: str) -> dict[str, Any]:
+    def _payload(self, item: _Message) -> dict[str, Any]:
+        result = asdict(item)
+        if self.structure == "flat":
+            return {k: result[k] for k in ("id", "author", "text", "timestamp")}
+        return result
+
+    def post(self, agent_id: str, text: str, *, parent_id: int | None = None,
+             relation: str = "comment") -> dict[str, Any]:
         if not self.enabled:
             raise RuntimeError("The shared board is disabled")
         if not isinstance(agent_id, str) or not agent_id:
@@ -65,16 +79,37 @@ class SharedBoard:
         if not isinstance(text, str) or len(text) > self.max_text_length:
             raise ValueError(f"text must be a string up to {self.max_text_length} characters")
         with self._lock:
+            if relation not in ("comment", "agree", "disagree", "question"):
+                raise ValueError("Unknown reply relation")
+            if self.structure == "flat" and (parent_id is not None or relation != "comment"):
+                raise ValueError("Replies require threaded structure")
+            if parent_id is None and relation != "comment":
+                raise ValueError("A relation requires a reply parent")
+            if parent_id is not None:
+                if isinstance(parent_id, bool) or not isinstance(parent_id, int) or not 0 <= parent_id < len(self._messages):
+                    raise ValueError("parent_id must identify an existing message")
+                parent = self._messages[parent_id]
+                if parent.author != agent_id and parent_id not in self._delivered.get(agent_id, set()):
+                    raise ValueError("Read the parent message before replying")
             if len(self._messages) >= self.max_messages:
                 raise ValueError("Board capacity reached")
             item = _Message(id=len(self._messages), author=agent_id, text=text,
-                            timestamp=datetime.now(timezone.utc).isoformat())
+                            timestamp=datetime.now(timezone.utc).isoformat(), parent_id=parent_id,
+                            thread_id=(self._messages[parent_id].thread_id if parent_id is not None else len(self._messages)),
+                            relation=relation)
             self._messages.append(item)
-            result = asdict(item)
-            self._log("board_post", message=result)
+            result = self._payload(item)
+            if self.structure == "threaded":
+                self._log("board_post", message=result,
+                          read_before_post_ids=sorted(i for i in self._delivered.get(agent_id, set())
+                                                      if self._messages[i].author != agent_id))
+            else:
+                self._log("board_post", message=result)
             return result
 
     def read(self, agent_id: str, since: int = 0) -> list[dict[str, Any]]:
+        if self.structure == "threaded":
+            raise ValueError("Use read_threads for a threaded board")
         if not self.enabled:
             raise RuntimeError("The shared board is disabled")
         if not isinstance(agent_id, str) or not agent_id:
@@ -82,17 +117,73 @@ class SharedBoard:
         if isinstance(since, bool) or not isinstance(since, int) or since < 0:
             raise ValueError("since must be a non-negative integer message id")
         with self._lock:
-            result = [asdict(item) for item in self._messages if item.id >= since]
+            result = [self._payload(item) for item in self._messages if item.id >= since]
             self._delivered.setdefault(agent_id, set()).update(item["id"] for item in result)
             self._log("board_read", agent=agent_id, since=since,
                       exposed_message_ids=[item["id"] for item in result])
+            return result
+
+    def _thread_access(self, agent_id: str) -> None:
+        if not self.enabled:
+            raise RuntimeError("The shared board is disabled")
+        if self.structure != "threaded":
+            raise ValueError("This operation requires a threaded board")
+        if not isinstance(agent_id, str) or not agent_id:
+            raise ValueError("agent_id must be a non-empty string")
+
+    def list_threads(self, agent_id: str, unread_only: bool = False) -> list[dict[str, Any]]:
+        """Metadata only: listing does not deliver message bodies or clear unread state."""
+        self._thread_access(agent_id)
+        if not isinstance(unread_only, bool):
+            raise ValueError("unread_only must be a bool")
+        with self._lock:
+            unread = {m["id"] for m in self.unread(agent_id)}
+            result = []
+            for root in self._messages:
+                if root.parent_id is not None:
+                    continue
+                members = [m for m in self._messages if m.thread_id == root.id]
+                pending = [m.id for m in members if m.id in unread]
+                if unread_only and not pending:
+                    continue
+                result.append(dict(thread_id=root.id, author=root.author, timestamp=root.timestamp,
+                                   reply_count=len(members)-1, unread_message_ids=pending))
+            self._log("board_list_threads", agent=agent_id, unread_only=unread_only,
+                      listed_thread_ids=[r["thread_id"] for r in result], exposed_message_ids=[])
+            return result
+
+    def read_threads(self, agent_id: str, thread_id: int | None = None,
+                     unread_only: bool = True) -> list[dict[str, Any]]:
+        """Return complete trees, including ancestors of unread replies."""
+        self._thread_access(agent_id)
+        if not isinstance(unread_only, bool):
+            raise ValueError("unread_only must be a bool")
+        with self._lock:
+            if thread_id is not None:
+                if isinstance(thread_id, bool) or not isinstance(thread_id, int) or not 0 <= thread_id < len(self._messages) or self._messages[thread_id].parent_id is not None:
+                    raise ValueError("thread_id must identify a top-level post")
+                roots = {thread_id}
+            else:
+                roots = {m["thread_id"] for m in self.unread(agent_id)} if unread_only else {m.thread_id for m in self._messages}
+            selected = [m for m in self._messages if m.thread_id in roots]
+            nodes = {m.id: dict(self._payload(m), replies=[]) for m in selected}
+            result = []
+            for m in selected:
+                if m.parent_id is None:
+                    result.append(nodes[m.id])
+                else:
+                    nodes[m.parent_id]["replies"].append(nodes[m.id])
+            ids = [m.id for m in selected]
+            self._delivered.setdefault(agent_id, set()).update(ids)
+            self._log("board_read", agent=agent_id, thread_id=thread_id, unread_only=unread_only,
+                      exposed_message_ids=ids)
             return result
 
     def unread(self, agent_id: str) -> list[dict[str, Any]]:
         """Messages by other agents that ``agent_id`` has not yet received through ``read``."""
         with self._lock:
             delivered = self._delivered.get(agent_id, set())
-            return [asdict(item) for item in self._messages
+            return [self._payload(item) for item in self._messages
                     if item.author != agent_id and item.id not in delivered]
 
     def deliver_unread(self, agent_id: str) -> list[dict[str, Any]]:
@@ -228,6 +319,8 @@ class FairScheduler:
 
 def _board_tools(board: SharedBoard, agent_id: str,
                  scheduler: FairScheduler) -> list[Any]:
+    if board.structure == "threaded":
+        return _threaded_board_tools(board, agent_id, scheduler)
     @tool(name="board_read")
     def board_read() -> Any:
         async def read(since: int = 0) -> str:
@@ -259,6 +352,66 @@ def _board_tools(board: SharedBoard, agent_id: str,
         return post
 
     return [board_read(), board_post()]
+
+
+def _threaded_board_tools(board: SharedBoard, agent_id: str,
+                          scheduler: FairScheduler) -> list[Any]:
+    def invoke(name, method, *args, **kwargs):
+        started = time.monotonic()
+        try:
+            return json.dumps(method(agent_id, *args, **kwargs), ensure_ascii=False)
+        finally:
+            scheduler.record_tool_time(agent_id, name, time.monotonic() - started)
+
+    @tool(name="board_list_threads")
+    def list_threads():
+        async def listing(unread_only: bool = False) -> str:
+            """List thread IDs, authors, times, reply counts and unread IDs; no message bodies.
+
+            Args:
+                unread_only: Only list threads containing unread peer messages.
+            """
+            return invoke("board_list_threads", board.list_threads, unread_only)
+        return listing
+
+    @tool(name="board_read")
+    def read_threads():
+        async def read(thread_id: int | None = None, unread_only: bool = True) -> str:
+            """Read nested post/reply trees. No cursor is needed; reads clear delivered unread messages.
+
+            Args:
+                thread_id: Read this top-level post's complete thread; overrides unread_only.
+                unread_only: Without a thread ID, read threads with unread messages; false reads all threads.
+            """
+            return invoke("board_read", board.read_threads, thread_id, unread_only)
+        return read
+
+    @tool(name="board_post")
+    def post_thread():
+        async def post(text: str) -> str:
+            """Start a new top-level thread for a distinct finding or question.
+
+            Args:
+                text: Post text, up to 2000 characters.
+            """
+            return invoke("board_post", board.post, text)
+        return post
+
+    @tool(name="board_reply")
+    def reply_thread():
+        async def reply(parent_id: int, text: str,
+                        relation: Literal["agree", "disagree", "question", "comment"] = "comment") -> str:
+            """Reply to a post or reply you have read, creating a child in its thread.
+
+            Args:
+                parent_id: ID of the message being answered (must already have been read).
+                text: Reply text, up to 2000 characters; explain your response.
+                relation: Explicit stance: agree, disagree, question, or comment.
+            """
+            return invoke("board_reply", board.post, text, parent_id=parent_id, relation=relation)
+        return reply
+
+    return [list_threads(), read_threads(), post_thread(), reply_thread()]
 
 
 def _exception_status(error: BaseException) -> tuple[set[int], set[str]]:
