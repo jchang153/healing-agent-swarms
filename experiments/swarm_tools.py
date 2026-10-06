@@ -179,6 +179,11 @@ class SharedBoard:
                       exposed_message_ids=ids)
             return result
 
+    def get(self, message_id: int) -> dict[str, Any]:
+        """One message by ID, for the trusted caller (not logged as an exposure)."""
+        with self._lock:
+            return self._payload(self._messages[message_id])
+
     def unread(self, agent_id: str) -> list[dict[str, Any]]:
         """Messages by other agents that ``agent_id`` has not yet received through ``read``."""
         with self._lock:

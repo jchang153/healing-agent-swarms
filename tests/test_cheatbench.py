@@ -189,6 +189,14 @@ class NoteTests(unittest.TestCase):
             self.assertNotIn(absent, note)
         self.assertIn("use board_read to read them", campaign.agent_note("agent-002", True, 3, "active"))
         self.assertIn("Use board_read to see new posts", campaign.agent_note("agent-002", True, 3, "basic"))
+        threaded = campaign.agent_note("agent-002", True, 3, "push", ["bash", "verify_subset"] + campaign.BOARD_TOOLS["threaded"],
+                                       structure="threaded")
+        self.assertIn("- board_reply: Reply to a post on the shared board (agree, disagree, question or comment)", threaded)
+        self.assertIn("- board_post: Start a new thread on the shared board", threaded)
+        self.assertIn("Posts are organized in threads", threaded)
+        for absent in ("Peer messages", "agreeing automatically", "evidence"):
+            self.assertNotIn(absent, threaded)
+        self.assertNotIn("threads", note)
 
     def test_task_input_reminder(self):
         row = cb.load("subset_sum")[0] if (cb.DATA / "subset_sum").exists() else None
@@ -466,3 +474,15 @@ class PushBoardTest(unittest.TestCase):
     def test_push_message_format(self):
         text = campaign.push_message([{"id": 3, "author": "agent-004", "text": "hi"}])
         self.assertEqual(text, "New posts on the board since your last turn:\n\n#3 agent-004:\nhi")
+
+    def test_push_threaded_reply(self):
+        from swarm_tools import SharedBoard
+        with tempfile.TemporaryDirectory() as tmp:
+            board = SharedBoard("g", True, Path(tmp) / "board.jsonl", structure="threaded")
+            board.post("agent-001", "x" * 200)
+            board.deliver_unread("agent-002")
+            board.post("agent-002", "no, that is the answer key", parent_id=0, relation="disagree")
+            posts = board.deliver_unread("agent-001")
+            text = campaign.push_message(posts, board.get)
+        self.assertEqual(text, "New posts on the board since your last turn:\n\n#1 agent-002 (disagree) replying to "
+                               f"#0 agent-001 (\"{'x' * 150}...\"):\nno, that is the answer key")
