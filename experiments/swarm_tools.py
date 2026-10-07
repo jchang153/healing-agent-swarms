@@ -217,6 +217,25 @@ class SharedBoard:
                 f"on the shared board from {authors}. Use board_read to read {'them' if count != 1 else 'it'}.")
 
 
+QUOTE_CHARS = 150  # start of the parent post shown with a pushed reply
+
+
+def push_message(posts: list[dict], get=None) -> str:
+    """Unread posts as one message, in the source harness's round-update format (without rounds).
+
+    A reply (threaded board) names its stance and the post it answers, with the start of that
+    post; ``get`` looks a post up by ID. The parent was already pushed or is the agent's own.
+    """
+    def header(p):
+        if p.get("parent_id") is None:
+            return f"#{p['id']} {p['author']}:"
+        parent = get(p["parent_id"])
+        quote = parent["text"][:QUOTE_CHARS] + ("..." if len(parent["text"]) > QUOTE_CHARS else "")
+        return f"#{p['id']} {p['author']} ({p['relation']}) replying to #{parent['id']} {parent['author']} (\"{quote}\"):"
+    body = "\n\n".join(f"{header(p)}\n{p['text']}" for p in posts)
+    return f"New posts on the board since your last turn:\n\n{body}"
+
+
 class FairScheduler:
     """FIFO scheduler allowing up to ``max_concurrent`` generate calls at a time."""
 
@@ -247,6 +266,12 @@ class FairScheduler:
     def start(self) -> None:
         if self._deadline is None:
             self._deadline = asyncio.get_running_loop().time() + self.seconds
+
+    def remaining(self) -> float:
+        """Seconds until the group's deadline (the full budget if not started)."""
+        if self._deadline is None:
+            return self.seconds
+        return self._deadline - asyncio.get_running_loop().time()
 
     async def acquire(self, agent_id: str) -> bool:
         if agent_id not in self._turns:
@@ -320,6 +345,53 @@ class FairScheduler:
                         "generation_times_seconds": list(self._api_times[agent]),
                         "tool_times": list(self._tool_times[agent])}
                 for agent in self.agent_ids}
+
+
+class WakeTracker:
+    """Per-group state for agents that go idle after finishing and wake on new board posts.
+
+    Each agent is working, idle (finished; waiting for posts) or done (stopped by a limit
+    or an error, or the episode ended). The episode ends at the scheduler's deadline, or
+    once nobody is working and no idle agent has unread posts ("quiescent"): then no new
+    post can arrive.
+    """
+
+    def __init__(self, agent_ids: list[str] | tuple[str, ...], board: SharedBoard,
+                 scheduler: FairScheduler, poll_seconds: float = 1.0) -> None:
+        if not board.enabled:
+            raise ValueError("Waking on posts requires an enabled board")
+        self.board = board
+        self.scheduler = scheduler
+        self.poll_seconds = poll_seconds
+        self._state = {agent: "working" for agent in agent_ids}
+        self.end_reason: str | None = None
+
+    def set_done(self, agent_id: str) -> None:
+        self._state[agent_id] = "done"
+
+    def _quiescent(self) -> bool:
+        return all(s != "working" for s in self._state.values()) and not any(
+            s == "idle" and self.board.unread(a) for a, s in self._state.items())
+
+    async def wait_for_posts(self, agent_id: str) -> list[dict[str, Any]]:
+        """Idle until ``agent_id`` has unread posts, then deliver and return them.
+
+        Returns [] when the episode is over; the agent is then done.
+        """
+        self._state[agent_id] = "idle"
+        while True:
+            # The deadline wins over pending posts: a turn after it would be refused.
+            if self.end_reason is None and self.scheduler.remaining() <= 0:
+                self.end_reason = "deadline"
+            if self.end_reason is None and self.board.unread(agent_id):
+                self._state[agent_id] = "working"
+                return self.board.deliver_unread(agent_id)
+            if self.end_reason is None and self._quiescent():
+                self.end_reason = "quiescent"
+            if self.end_reason is not None:
+                self._state[agent_id] = "done"
+                return []
+            await asyncio.sleep(self.poll_seconds)
 
 
 def _board_tools(board: SharedBoard, agent_id: str,

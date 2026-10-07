@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from inspect_ai.model import ChatCompletionChoice, ChatMessageAssistant, ModelOutput
 from inspect_ai.tool import tool
 
-from experiments.swarm_tools import FairScheduler, SharedBoard, swarm_adapter
+from experiments.swarm_tools import FairScheduler, SharedBoard, WakeTracker, swarm_adapter
 
 
 class SharedBoardTests(unittest.TestCase):
@@ -349,6 +349,58 @@ class AdapterTests(unittest.IsolatedAsyncioTestCase):
             result = await adapted(state, lambda current: asyncio.sleep(0, result=current))
             self.assertIs(result, state)
             self.assertEqual(state.tools, [original])
+
+
+class WakeTrackerTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.board = SharedBoard("group-a", True, Path(self.directory.name) / "board.jsonl")
+
+    def tearDown(self):
+        self.directory.cleanup()
+
+    def tracker(self, seconds=5.0):
+        scheduler = FairScheduler(["a", "b"], 10, seconds)
+        scheduler.start()
+        return WakeTracker(["a", "b"], self.board, scheduler, poll_seconds=0.01)
+
+    async def test_idle_agent_is_woken_by_a_peer_post_and_receives_it(self):
+        tracker = self.tracker()
+        waiting = asyncio.create_task(tracker.wait_for_posts("a"))
+        await asyncio.sleep(0.05)
+        self.assertFalse(waiting.done())  # b is still working
+        self.board.post("b", "please check")
+        posts = await asyncio.wait_for(waiting, timeout=0.5)
+        self.assertEqual([p["text"] for p in posts], ["please check"])
+        self.assertEqual(self.board.unread("a"), [])
+        self.assertIsNone(tracker.end_reason)
+
+    async def test_episode_ends_when_nobody_works_and_nothing_is_unread(self):
+        tracker = self.tracker()
+        self.board.post("a", "own post")
+        self.board.read("b")  # b has read it, so it does not wake b
+        tracker.set_done("b")
+        self.assertEqual(await asyncio.wait_for(tracker.wait_for_posts("a"), timeout=0.5), [])
+        self.assertEqual(tracker.end_reason, "quiescent")
+
+    async def test_unread_posts_of_done_agents_do_not_keep_the_episode_open(self):
+        tracker = self.tracker()
+        self.board.post("a", "never read by b")
+        tracker.set_done("b")
+        self.assertEqual(await asyncio.wait_for(tracker.wait_for_posts("a"), timeout=0.5), [])
+        self.assertEqual(tracker.end_reason, "quiescent")
+
+    async def test_deadline_ends_the_wait_even_with_unread_posts(self):
+        tracker = self.tracker(seconds=0.02)
+        self.board.post("b", "too late")
+        await asyncio.sleep(0.05)
+        self.assertEqual(await asyncio.wait_for(tracker.wait_for_posts("a"), timeout=0.5), [])
+        self.assertEqual(tracker.end_reason, "deadline")
+
+    def test_disabled_board_is_rejected(self):
+        board = SharedBoard("group-a", False, Path(self.directory.name) / "unused.jsonl")
+        with self.assertRaises(ValueError):
+            WakeTracker(["a"], board, FairScheduler(["a"], 1, 1))
 
 
 if __name__ == "__main__":

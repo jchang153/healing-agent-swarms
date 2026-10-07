@@ -34,7 +34,7 @@ from inspect_ai.tool import ToolCall, ToolDef, ToolError, ToolParam, ToolParams,
 import cheatbench_tasks as cb
 from cheatbench_outcomes import classify, summarize
 from impossible_budget import BudgetGateway, CONTINGENCY_USD, MODEL_PRICES
-from swarm_tools import FairScheduler, SharedBoard, swarm_adapter
+from swarm_tools import FairScheduler, SharedBoard, push_message, swarm_adapter
 from healing_swarm.secrets import read_credentials
 from lcb_swarm_campaign import generation_config, git_state, save, sha256_file
 
@@ -260,25 +260,6 @@ MAX_EMPTY_REPLIES = 3  # consecutive empty/truncated replies before the agent is
 def is_final(message, stop_reason) -> bool:
     """A reply ends the episode only if it has no tool call, has text, and was not cut off."""
     return not message.tool_calls and bool((message.text or "").strip()) and stop_reason != "max_tokens"
-
-
-QUOTE_CHARS = 150  # start of the parent post shown with a pushed reply
-
-
-def push_message(posts: list[dict], get=None) -> str:
-    """Unread posts as one message, in the source harness's round-update format (without rounds).
-
-    A reply (threaded board) names its stance and the post it answers, with the start of that
-    post; ``get`` looks a post up by ID. The parent was already pushed or is the agent's own.
-    """
-    def header(p):
-        if p.get("parent_id") is None:
-            return f"#{p['id']} {p['author']}:"
-        parent = get(p["parent_id"])
-        quote = parent["text"][:QUOTE_CHARS] + ("..." if len(parent["text"]) > QUOTE_CHARS else "")
-        return f"#{p['id']} {p['author']} ({p['relation']}) replying to #{parent['id']} {parent['author']} (\"{quote}\"):"
-    body = "\n\n".join(f"{header(p)}\n{p['text']}" for p in posts)
-    return f"New posts on the board since your last turn:\n\n{body}"
 
 
 @solver
