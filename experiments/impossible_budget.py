@@ -64,6 +64,7 @@ class BudgetGateway:
         max_in_flight: int = 1,
         prices: dict[str, tuple[float, float]] | None = None,
         max_output_tokens: int = MAX_OUTPUT_TOKENS,
+        lenient: bool = False,
     ) -> None:
         if not isinstance(key, str) or not key:
             raise ValueError("An OpenRouter key must be supplied in memory")
@@ -88,6 +89,10 @@ class BudgetGateway:
         # Allow-listed models and their prices; defaults to the experiment models above.
         self._prices = {m: (float(v[0]), float(v[1])) for m, v in (prices or MODEL_PRICES).items()}
         self._max_output_tokens = max_output_tokens
+        # Lenient: a failed upstream request (rate limit, timeout, bad usage record) releases its
+        # reservation and returns an error the client may retry, instead of disabling dispatch.
+        # The spend record can then miss charges for failed requests (rare; usually unbilled).
+        self._lenient = lenient
         self._agent_limits = dict(agent_limits or {})
         self._max_tokens = max_tokens
         self._deadline = deadline_monotonic
@@ -556,6 +561,20 @@ class BudgetGateway:
             return
 
         exc = failure
+        if self._lenient and isinstance(exc, Exception):
+            status = exc.code if isinstance(exc, urllib.error.HTTPError) else 502
+            with self._lock:
+                row = {"time": datetime.now(timezone.utc).isoformat(), "agent": agent_id, "model": model,
+                       "type": type(exc).__name__, "status": status,
+                       "message": str(exc)[:500].replace(self.__key, "[redacted]")}
+                with (self._outdir / "errors.jsonl").open("a", encoding="utf-8") as stream:
+                    stream.write(json.dumps(row) + "\n")
+                self._reserved.pop(request_id, None)
+                self._reserved_agents.pop(request_id, None)
+                self._reserved_tokens.pop(request_id, None)
+                self._persist_locked()
+            self._error(handler, status, f"upstream request failed ({status}); retry")
+            return
         if isinstance(exc, urllib.error.HTTPError):
             try:
                 detail=json.loads(exc.read(8192)).get('error',{})

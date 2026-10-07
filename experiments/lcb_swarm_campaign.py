@@ -340,8 +340,16 @@ def scripted_model(agent_id: str, peer_id: str, role: str, structure: str = "fla
     return get_model("mockllm/" + agent_id, custom_outputs=generate, memoize=False)
 
 
+def provider_routing(args) -> dict:
+    """OpenRouter routing: no fallbacks, all parameters required; optionally one pinned provider."""
+    routing = {"allow_fallbacks": False, "require_parameters": True}
+    if getattr(args, "provider", None):
+        routing["order"] = [args.provider]
+    return routing
+
+
 def generation_config(args, gateway_agent: str) -> GenerateConfig:
-    return GenerateConfig(max_tokens=args.max_output_tokens, max_retries=0, timeout=600, attempt_timeout=600,
+    return GenerateConfig(max_tokens=args.max_output_tokens, max_retries=getattr(args, "model_retries", 0), timeout=600, attempt_timeout=600,
                           max_connections=1, temperature=args.temperature, seed=args.seed,
                           extra_headers={"x-agent-id": gateway_agent},
                           reasoning_effort=args.reasoning_effort if args.model.startswith("openai/") else None,
@@ -428,7 +436,7 @@ def build_group(args, out: Path, group_id: str, task_id: str, row: dict, *, scri
         else:
             task.model = get_model("openrouter/" + args.model, config=generation_config(args, f"{group_id}/{agent_id}"),
                                    base_url=base_url, api_key="local-budget-proxy",
-                                   provider={"allow_fallbacks": False, "require_parameters": True},
+                                   provider=provider_routing(args),
                                    stream=False, memoize=False)
         input_hook = None
         if enabled and args.board_style == "active":
@@ -622,7 +630,7 @@ async def run(args) -> Path:
             raise ValueError("OpenRouter credential unavailable")
         per_agent = args.max_usd_per_agent or args.max_usd
         gateway = BudgetGateway(key, out / "billing", args.max_usd, max_tokens=args.max_tokens,
-                                max_in_flight=args.max_in_flight,
+                                max_in_flight=args.max_in_flight, lenient=args.lenient_accounting,
                                 agent_limits={f"{g}/agent-{i + 1:03d}": per_agent for g, *_ in groups for i in range(args.agents)})
         base_url = gateway.start()
     os.environ["OPENROUTER_API_KEY"] = "local-budget-proxy"  # The real key stays inside the gateway.
@@ -638,7 +646,8 @@ async def run(args) -> Path:
         "generation": {"max_output_tokens": args.max_output_tokens, "temperature": args.temperature, "seed": args.seed,
                        "reasoning_effort": args.reasoning_effort if args.model.startswith("openai/") else None,
                        "reasoning_tokens": args.reasoning_tokens if args.model.startswith("anthropic/") else None,
-                       "provider": {"allow_fallbacks": False, "require_parameters": True}, "max_retries": 0},
+                       "provider": provider_routing(args), "max_retries": args.model_retries},
+        "lenient_accounting": args.lenient_accounting,
         "limits_per_agent": {"max_submissions": args.max_attempts, "message_limit": args.message_limit,
                              "max_generations": args.max_turns, "max_usd": args.max_usd_per_agent or args.max_usd},
         "limits_shared": {"seconds_per_group": args.seconds, "max_usd_campaign": args.max_usd, "max_tokens_campaign": args.max_tokens,
@@ -806,7 +815,15 @@ def main():
     p.add_argument("--label", default=None, help="Short name for the run folder and index (default: built from settings)")
     p.add_argument("--note", default=None, help="Why this run was made; saved in the manifest and shown in runs/INDEX.md")
     p.add_argument("--image", default=DEFAULT_IMAGE)
+    p.add_argument("--provider", default=None, help="Pin one OpenRouter provider (e.g. Parasail); no fallbacks")
+    p.add_argument("--lenient-accounting", action="store_true",
+                   help="Budget gateway: a failed request (e.g. a rate limit) is released and retried by Inspect "
+                        "instead of stopping every agent; spend records may miss charges for failed requests")
+    p.add_argument("--model-retries", type=int, default=None,
+                   help="Inspect retries per model call (default 0, or 6 with --lenient-accounting)")
     args = p.parse_args()
+    if args.model_retries is None:
+        args.model_retries = 6 if args.lenient_accounting else 0
     if args.mode == "check":
         args.split, args.agents, args.max_attempts, args.max_usd = "conflicting", 2, 2, 0
         args.parallel_groups = 3  # Exercise the multi-group path.

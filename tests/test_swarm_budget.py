@@ -51,6 +51,15 @@ class SwarmBudgetTests(unittest.TestCase):
   restored=self.gateway();self.assertEqual(restored.snapshot()['agents']['A']['reserved_usd'],before['agents']['A']['reserved_usd'])
   with patch('experiments.impossible_budget.urllib.request.urlopen') as upstream:
    restored._handle_post(Handler('B'));upstream.assert_not_called()
+ def test_lenient_gateway_releases_failed_request_and_keeps_dispatching(self):
+  import urllib.error
+  g=self.gateway(lenient=True)
+  limited=urllib.error.HTTPError('u',429,'rate limited',{},io.BytesIO(b'{}'))
+  with patch('experiments.impossible_budget.urllib.request.urlopen',side_effect=[limited,TimeoutError('slow'),Response()]):
+   for expected in (429,502,200):
+    h=Handler('B');g._handle_post(h);self.assertEqual(h.status,expected)
+  snap=g.snapshot();self.assertFalse(snap['accounting_uncertain']);self.assertEqual(snap['reserved_tokens'],0);self.assertAlmostEqual(snap['spent_usd'],.07)
+  self.assertEqual(len((self.out/'errors.jsonl').read_text().splitlines()),2)
  def test_dollar_limit_refusal_is_persisted(self):
   g=BudgetGateway('dummy',self.out,.55)
   with patch('experiments.impossible_budget.urllib.request.urlopen') as upstream:
