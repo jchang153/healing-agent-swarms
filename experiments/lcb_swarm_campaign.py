@@ -273,9 +273,12 @@ def wake_on_posts(inner, tracker: WakeTracker, agent_id: str, agent_dir: Path):
                 state = await loop(state, generate)
         finally:
             tracker.set_done(agent_id)
-        # Nonzero only after a deadline end: posts this agent never got to respond to.
-        state.metadata["wake"] = {"wakes": wakes, "episode_end": tracker.end_reason,
-                                  "unread_at_end": len(tracker.board.unread(agent_id))}
+            # Written here so agents stopped by a limit (an exception) get it too. episode_end is
+            # None if the agent stopped before the episode ended; unread = posts it never answered.
+            record = {"wakes": wakes, "episode_end": tracker.end_reason,
+                      "unread_at_end": len(tracker.board.unread(agent_id))}
+            save(agent_dir / "wake.json", record)
+            state.metadata["wake"] = record
         return state
     return solve
 
@@ -465,8 +468,10 @@ def wake_fields(agent_dir: Path, subs: list[dict], final_outcome: str) -> dict:
     first = final_outcome
     if idles and contexts:
         first = classify(idles[0]["value"], subs[:contexts[0]["submissions_before"]] + [idles[0]], None)
+    end = json.loads((agent_dir / "wake.json").read_text()) if (agent_dir / "wake.json").exists() else {}
     return {"wakes": len(read_jsonl(agent_dir / "wakes.jsonl")), "finishes": len(idles),
-            "outcome_first_finish": first}
+            "outcome_first_finish": first, "episode_end": end.get("episode_end"),
+            "unread_at_end": end.get("unread_at_end")}
 
 
 def collect_group(group: dict, logs_by_key: dict, status: str) -> list[dict]:
@@ -571,7 +576,7 @@ def write_report(out: Path, manifest: dict, rows: list[dict], accounting: dict) 
                   f"finish: {first}/{len(woke)}; at the end: {final}/{len(woke)}. First finish is descriptive, not a "
                   "no-wake baseline: a slower agent may already have read posts from agents that woke. Compare with "
                   "separate board groups run without --wake-on-posts. Each wake gives a fresh max_attempts.", "",
-                  f"Agents with unread posts when the episode ended (deadline): {unread}/{len(woke)}.", ""]
+                  f"Agents with unread posts when they stopped (deadline or a limit): {unread}/{len(woke)}.", ""]
     lines += ["", "## Agents", "", "| Group | Task | Agent | Score | Outcome | First finish | Wakes | Test edited | Other files changed | Stop | Turns | Scorings |",
               "|---|---|---|---:|---|---|---:|---|---|---|---:|---:|"]
     for r in rows:
